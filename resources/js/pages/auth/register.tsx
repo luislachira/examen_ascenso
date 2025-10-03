@@ -1,117 +1,147 @@
-import RegisteredUserController from '@/actions/App/Http/Controllers/Auth/RegisteredUserController';
-import { login } from '@/routes';
-import { Form, Head } from '@inertiajs/react';
-import { LoaderCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import '@res/css/LoginPage.css';
+import logo from '../../assets/logo_leonor_cerna 2.png';
+import { useAuth } from '../../hooks/useAuth';
 
-import InputError from '@/components/input-error';
-import TextLink from '@/components/text-link';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import AuthLayout from '@/layouts/auth-layout';
-
-export default function Register() {
-    return (
-        <AuthLayout
-            title="Create an account"
-            description="Enter your details below to create your account"
-        >
-            <Head title="Register" />
-            <Form
-                {...RegisteredUserController.store.form()}
-                resetOnSuccess={['password', 'password_confirmation']}
-                disableWhileProcessing
-                className="flex flex-col gap-6"
-            >
-                {({ processing, errors }) => (
-                    <>
-                        <div className="grid gap-6">
-                            <div className="grid gap-2">
-                                <Label htmlFor="name">Name</Label>
-                                <Input
-                                    id="name"
-                                    type="text"
-                                    required
-                                    autoFocus
-                                    tabIndex={1}
-                                    autoComplete="name"
-                                    name="name"
-                                    placeholder="Full name"
-                                />
-                                <InputError
-                                    message={errors.name}
-                                    className="mt-2"
-                                />
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    required
-                                    tabIndex={2}
-                                    autoComplete="email"
-                                    name="email"
-                                    placeholder="email@example.com"
-                                />
-                                <InputError message={errors.email} />
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="password">Password</Label>
-                                <Input
-                                    id="password"
-                                    type="password"
-                                    required
-                                    tabIndex={3}
-                                    autoComplete="new-password"
-                                    name="password"
-                                    placeholder="Password"
-                                />
-                                <InputError message={errors.password} />
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="password_confirmation">
-                                    Confirm password
-                                </Label>
-                                <Input
-                                    id="password_confirmation"
-                                    type="password"
-                                    required
-                                    tabIndex={4}
-                                    autoComplete="new-password"
-                                    name="password_confirmation"
-                                    placeholder="Confirm password"
-                                />
-                                <InputError
-                                    message={errors.password_confirmation}
-                                />
-                            </div>
-
-                            <Button
-                                type="submit"
-                                className="mt-2 w-full"
-                                tabIndex={5}
-                                data-test="register-user-button"
-                            >
-                                {processing && (
-                                    <LoaderCircle className="h-4 w-4 animate-spin" />
-                                )}
-                                Create account
-                            </Button>
-                        </div>
-
-                        <div className="text-center text-sm text-muted-foreground">
-                            Already have an account?{' '}
-                            <TextLink href={login()} tabIndex={6}>
-                                Log in
-                            </TextLink>
-                        </div>
-                    </>
-                )}
-            </Form>
-        </AuthLayout>
-    );
+interface RegisterForm {
+    nombre: string;
+    apellidos: string;
+    dni: string;
+    correo: string;
+    password: string;
+    password_confirmation: string;
 }
+
+const Register: React.FC = () => {
+    const { register } = useAuth();
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [formData, setFormData] = useState<RegisterForm>({
+        nombre: '',
+        apellidos: '',
+        dni: '',
+        correo: '',
+        password: '',
+        password_confirmation: ''
+    });
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData({
+            ...formData,
+            [e.target.name]: e.target.value
+        });
+    };
+
+    const onSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
+        setLoading(true);
+
+        try {
+            await register(formData);
+            alert('Registro exitoso, espere hasta que el administrador acepte su solicitud');
+            window.location.href = '/login';
+        } catch (err) {
+            const error = err as { response?: { data?: { message?: string } } };
+            setError(error?.response?.data?.message || 'Error al registrar usuario');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="login-container">
+            <div className="login-box">
+                <div className="login-header">
+                    <img src={logo} alt="Logo I.E. Leonor Cerna de Valdiviezo" />
+                    <h2>I.E. LEONOR CERNA DE VALDIVIEZO</h2>
+                </div>
+                <form className="login-form" onSubmit={onSubmit}>
+                    <div className="input-group">
+                        <label htmlFor="nombre">Nombres</label>
+                        <input
+                            type="text"
+                            id="nombre"
+                            name="nombre"
+                            required
+                            value={formData.nombre}
+                            onChange={handleChange}
+                        />
+                    </div>
+                    <div className="input-group">
+                        <label htmlFor="apellidos">Apellidos</label>
+                        <input
+                            type="text"
+                            id="apellidos"
+                            name="apellidos"
+                            required
+                            value={formData.apellidos}
+                            onChange={handleChange}
+                        />
+                    </div>
+                    <div className="input-group">
+                        <label htmlFor="dni">DNI</label>
+                        <input
+                            type="text"
+                            id="dni"
+                            name="dni"
+                            required
+                            pattern="[0-9]{8}"
+                            title="DNI debe tener 8 dígitos"
+                            value={formData.dni}
+                            onChange={handleChange}
+                        />
+                    </div>
+                    <div className="input-group">
+                        <label htmlFor="correo">Correo Electrónico</label>
+                        <input
+                            type="email"
+                            id="correo"
+                            name="correo"
+                            required
+                            value={formData.correo}
+                            onChange={handleChange}
+                        />
+                    </div>
+                    <div className="input-group">
+                        <label htmlFor="password">Contraseña</label>
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            required
+                            minLength={8}
+                            value={formData.password}
+                            onChange={handleChange}
+                        />
+                    </div>
+                    <div className="input-group">
+                        <label htmlFor="password_confirmation">Confirmar Contraseña</label>
+                        <input
+                            type="password"
+                            id="password_confirmation"
+                            name="password_confirmation"
+                            required
+                            minLength={8}
+                            value={formData.password_confirmation}
+                            onChange={handleChange}
+                        />
+                    </div>
+                    {error && <div className="error-message">{error}</div>}
+                    <button type="submit" className="btn btn-primary" disabled={loading}>
+                        {loading ? 'Registrando...' : 'Registrar'}
+                    </button>
+                    <button 
+                        type="button" 
+                        className="btn btn-secondary" 
+                        onClick={() => window.location.href = '/login'}
+                    >
+                        Volver al Login
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+export default Register;

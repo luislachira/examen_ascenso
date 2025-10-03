@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -13,14 +14,16 @@ return new class extends Migration
     {
         Schema::create('usuarios', function (Blueprint $table) {
             $table->integer('idUsuario', true);
+            $table->string('dni', 8)->unique();
             $table->string('nombre', 200);
             $table->string('apellidos', 250);
             $table->string('correo', 250)->unique('correo');
             $table->string('password', 200);
             $table->enum('rol', ['0', '1']);
-            $table->enum('estado', ['0', '1']);
+            $table->enum('estado', ['0', '1', '2']);
             $table->timestamps();
         });
+        DB::statement('ALTER TABLE usuarios ENGINE = InnoDB');
     }
 
     /**

@@ -17,6 +17,14 @@ export default defineConfig({
             formVariants: true,
         }),
     ],
+    resolve: {
+        extensions: ['.js', '.jsx', '.ts', '.tsx'],
+        alias: {
+            '@': '/resources/js',
+            '@res': '/resources',
+            '@css': '/resources/css',
+        },
+    },
     esbuild: {
         jsx: 'automatic',
     },

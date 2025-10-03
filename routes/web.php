@@ -1,17 +1,56 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\API\AuthController;
 use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('welcome');
-})->name('home');
+// Rutas OAuth (redirección y callback)
+Route::get('/oauth/redirect/{provider}', [AuthController::class, 'redirectToProvider']);
+Route::get('/oauth/callback/{provider}', [AuthController::class, 'handleProviderCallback']);
 
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('dashboard', function () {
-        return Inertia::render('dashboard');
-    })->name('dashboard');
+// Home -> Login
+Route::get('/', function () {
+    return Inertia::render('LoginPage');
 });
 
-require __DIR__.'/settings.php';
-require __DIR__.'/auth.php';
+// Rutas de la SPA con Inertia (renderizan componentes React de resources/js/pages)
+Route::get('/login', function () {
+    return Inertia::render('LoginPage');
+});
+
+Route::get('/oauth/success', function () {
+    return Inertia::render('auth/oauth-success');
+});
+
+Route::get('/admin/dashboard', function () {
+    return Inertia::render('admin/dashboard');
+});
+
+Route::get('/docente/examen', function () {
+    return Inertia::render('docente/Examenes');
+});
+
+// Rutas adicionales para el sidebar
+Route::get('/admin/usuarios', function () {
+    return Inertia::render('admin/UserManagement');
+});
+
+Route::get('/admin/banco', function () {
+    return Inertia::render('admin/banco');
+});
+
+Route::get('/admin/examenes', function () {
+    return Inertia::render('admin/examenes');
+});
+
+Route::get('/admin/resultados', function () {
+    return Inertia::render('admin/resultados');
+});
+
+Route::get('/docente/resultados', function () {
+    return Inertia::render('docente/resultados');
+});
+
+Route::get('/register', function () {
+    return Inertia::render('auth/register');
+});

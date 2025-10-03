@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -22,6 +23,7 @@ return new class extends Migration
             $table->time('duracionMin')->nullable();
             $table->enum('estado', ['0', '1', '2'])->nullable();
         });
+        DB::statement('ALTER TABLE examenes ENGINE = InnoDB');
     }
 
     /**
