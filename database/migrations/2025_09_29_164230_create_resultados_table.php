@@ -13,11 +13,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('resultados', function (Blueprint $table) {
-            $table->integer('idResultado', true);
-            $table->integer('idExamen');
-            $table->integer('idUsuario')->index('fk_resultado_docente');
+            $table->increments('idResultado');
+            $table->unsignedInteger('idExamen');
+            $table->unsignedInteger('idUsuario')->index('fk_resultado_docente');
             $table->integer('intento')->nullable()->default(1);
-            $table->decimal('puntaje', 5);
+            $table->decimal('puntaje', 5, 2);
             $table->boolean('aprobado')->nullable()->storedAs('(`puntaje` >= 11.00)');
             $table->timestamp('fechaRealizacion')->nullable()->useCurrent();
             $table->integer('tiempo_usado')->nullable()->comment('en segundo');

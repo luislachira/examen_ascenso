@@ -2,21 +2,13 @@ import React, { useState } from 'react';
 import '@res/css/LoginPage.css';
 import logo from '../../assets/logo_leonor_cerna 2.png';
 import { useAuth } from '../../hooks/useAuth';
-
-interface RegisterForm {
-    nombre: string;
-    apellidos: string;
-    dni: string;
-    correo: string;
-    password: string;
-    password_confirmation: string;
-}
+import { RegisterData } from '../../store/authStore';
 
 const Register: React.FC = () => {
     const { register } = useAuth();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [formData, setFormData] = useState<RegisterForm>({
+    const [formData, setFormData] = useState<RegisterData>({
         nombre: '',
         apellidos: '',
         dni: '',

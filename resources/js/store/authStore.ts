@@ -69,8 +69,22 @@ export const authStore = {
 };
 
 // Helpers de API
-export async function apiLogin(correo: string, password: string) {
-    const res = await clienteApi.post('/login', { correo, password });
+export interface LoginData {
+    correo: string;
+    password: string;
+}
+
+export interface RegisterData {
+    nombre: string;
+    apellidos: string;
+    dni: string;
+    correo: string;
+    password: string;
+    password_confirmation: string;
+}
+
+export async function apiLogin(data: LoginData) {
+    const res = await clienteApi.post('/login', data);
     const { access_token, usuario } = res.data;
     authStore.setTokenAndUser(access_token, {
         id: usuario.id,
@@ -89,15 +103,6 @@ export async function apiLogout() {
         // Ignore logout errors
     }
     authStore.clear();
-}
-
-export interface RegisterData {
-    nombre: string;
-    apellidos: string;
-    dni: string;
-    correo: string;
-    password: string;
-    password_confirmation: string;
 }
 
 export async function apiRegister(data: RegisterData): Promise<void> {

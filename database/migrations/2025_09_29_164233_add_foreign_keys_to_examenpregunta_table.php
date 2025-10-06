@@ -11,9 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('examenpregunta', function (Blueprint $table) {
-            $table->foreign(['idExamen'], 'fk_examenpregunta_examen')->references(['idExamen'])->on('examenes')->onUpdate('cascade')->onDelete('restrict');
-            $table->foreign(['idPregunta'], 'fk_examenpregunta_pregunta')->references(['idPregunta'])->on('preguntas')->onUpdate('cascade')->onDelete('restrict');
+        Schema::table('examen_pregunta', function (Blueprint $table) {
+            $table->foreign(['idExamen'], 'fk_examenpregunta_examen')->references(['idExamen'])->on('examenes')->onUpdate('cascade')->onDelete('cascade');
+            $table->foreign(['idPregunta'], 'fk_examenpregunta_pregunta')->references(['idPregunta'])->on('preguntas')->onUpdate('cascade')->onDelete('cascade');
         });
     }
 

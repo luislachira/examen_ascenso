@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
+use Laravel\Passport\HasApiTokens;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Usuario extends Authenticatable
@@ -21,10 +21,8 @@ class Usuario extends Authenticatable
     protected $table = 'usuarios';
     protected $primaryKey = 'idUsuario';
     public $incrementing = true;
-    protected $keyType = 'int';
 
     protected $fillable = [
-        'idUsuario',
         'dni',
         'nombre',
         'apellidos',
@@ -61,6 +59,44 @@ class Usuario extends Authenticatable
         return $this->hasMany(Resultado::class, 'idUsuario', 'idUsuario');
     }
 
+    // Accessors
+    public function getNombreCompletoAttribute()
+    {
+        return "{$this->nombre} {$this->apellidos}";
+    }
+
+    public function getRolNameAttribute()
+    {
+        return $this->rol === '0' ? 'Administrador' : 'Docente';
+    }
+
+    public function getEstadoNameAttribute()
+    {
+        return match ($this->estado) {
+            '0' => 'Inactivo',
+            '1' => 'Activo',
+            '2' => 'Suspendido',
+            default => 'Desconocido'
+        };
+    }
+
+    // Scopes
+    public function scopeActivos($query)
+    {
+        return $query->where('estado', '1');
+    }
+
+    public function scopeDocentes($query)
+    {
+        return $query->where('rol', '1');
+    }
+
+    public function scopeAdministradores($query)
+    {
+        return $query->where('rol', '0');
+    }
+
+    // Métodos de verificación
     public function esAdmin(): bool
     {
         return $this->rol === self::ROL_ADMINISTRADOR;
@@ -69,5 +105,10 @@ class Usuario extends Authenticatable
     public function esDocente(): bool
     {
         return $this->rol === self::ROL_DOCENTE;
+    }
+
+    public function isActivo()
+    {
+        return $this->estado === '1';
     }
 }

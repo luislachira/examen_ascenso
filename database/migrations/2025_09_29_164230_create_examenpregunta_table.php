@@ -12,12 +12,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('examenpregunta', function (Blueprint $table) {
-            $table->integer('idExamenPregunta', true);
-            $table->integer('idExamen')->index('idexamen');
-            $table->integer('idPregunta')->index('idpregunta');
+        Schema::create('examen_pregunta', function (Blueprint $table) {
+            $table->unsignedInteger('idExamen');
+            $table->unsignedInteger('idPregunta');
+            // Clave primaria compuesta
+            $table->primary(['idExamen', 'idPregunta']);
         });
-        DB::statement('ALTER TABLE examenpregunta ENGINE = InnoDB');
+        DB::statement('ALTER TABLE examen_pregunta ENGINE = InnoDB');
     }
 
     /**
@@ -25,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('examenpregunta');
+        Schema::dropIfExists('examen_pregunta');
     }
 };

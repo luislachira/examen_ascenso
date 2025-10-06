@@ -13,8 +13,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('opciones', function (Blueprint $table) {
-            $table->integer('idRespuesta', true);
-            $table->integer('idPregunta')->index('idpregunta');
+            $table->increments('idOpciones');
+            $table->unsignedInteger('idPregunta')->index('idpregunta');
             $table->string('texto_respuesta');
             $table->boolean('esCorrecta')->default(false)->comment('Si la respuesta es correcta');
         });
