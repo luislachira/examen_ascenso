@@ -1,3 +1,4 @@
+# Laravel
 /.phpunit.cache
 /bootstrap/ssr
 /node_modules
@@ -10,19 +11,123 @@
 /storage/*.key
 /storage/pail
 /vendor
-.DS_Store
+/storage/framework/cache/*
+!/storage/framework/cache/.gitignore
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitignore
+/storage/framework/testing/*
+!/storage/framework/testing/.gitignore
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
+/storage/logs/*
+!/storage/logs/.gitignore
+/storage/app/*
+!/storage/app/.gitignore
+/storage/app/public/*
+!/storage/app/public/.gitignore
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
+
+# Archivos de entorno y configuración sensible
 .env
+.env.*
+!.env.example
 .env.backup
 .env.production
-.phpactor.json
-.phpunit.result.cache
-Homestead.json
-Homestead.yaml
-npm-debug.log
-yarn-error.log
-/auth.json
+.env.local
+.env.*.local
+
+# Archivos de sistema operativo
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDEs y editores
 /.fleet
 /.idea
 /.nova
 /.vscode
 /.zed
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Archivos de prueba y desarrollo local
+test_*.php
+*_test.php
+check_*.php
+diagnose_*.php
+verificar_*.php
+catch_*.txt
+/public/check_*.php
+/public/test-*.html
+/public/test-*.php
+*.txt
+!README*.txt
+!QUICK_START.md
+!AUTHENTICATION_GUIDE.md
+!DOMAIN_UPDATE.md
+!IMPLEMENTATION_SUMMARY.md
+!OAUTH_PENDING_MESSAGE.md
+!OAUTH_PENDING_SUMMARY.md
+!REMOVE_DNI_CHANGES.md
+!SOLUCION_SSL_CURL.txt
+!test_oauth_scenarios.txt
+!CONFIGURAR_OAUTH_LOCAL.txt
+!PROBAR_MICROSOFT_OAUTH.txt
+!CHECKLIST_PRODUCCION.md
+
+# Archivos de configuración de herramientas
+.phpactor.json
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+/auth.json
+composer.phar
+
+# Certificados y claves
+/certs/*
+!/.gitkeep
+*.pem
+*.key
+*.crt
+*.csr
+
+# Archivos temporales
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+
+# Build y compilación
+/public/build/*
+/public/hot
+/dist/
+/build/
+
+# Archivos de base de datos local
+*.sqlite
+*.sqlite3
+*.db
+
+# Scripts de despliegue (mantener en repo)
+# Los scripts configurar-permisos.sh y configurar-permisos.ps1 deben estar en el repo
