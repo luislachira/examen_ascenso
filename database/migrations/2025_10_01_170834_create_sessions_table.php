@@ -20,7 +20,11 @@ return new class extends Migration
             $table->longText('payload');
             $table->integer('last_activity')->index();
         });
-        DB::statement('ALTER TABLE sessions ENGINE = InnoDB');
+
+        // Solo ejecutar en MySQL/MariaDB, no en SQLite (usado en tests)
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement('ALTER TABLE sessions ENGINE = InnoDB');
+        }
     }
 
     /**

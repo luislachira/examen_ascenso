@@ -22,7 +22,11 @@ return new class extends Migration
             $table->timestamp('expires_at')->nullable()->index();
             $table->timestamps();
         });
-        DB::statement('ALTER TABLE personal_access_tokens ENGINE = InnoDB');
+
+        // Solo ejecutar en MySQL/MariaDB, no en SQLite (usado en tests)
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement('ALTER TABLE personal_access_tokens ENGINE = InnoDB');
+        }
     }
 
     /**

@@ -22,7 +22,11 @@ return new class extends Migration
             $table->enum('estado', ['0', '1', '2']);
             $table->timestamps();
         });
-        DB::statement('ALTER TABLE usuarios ENGINE = InnoDB');
+
+        // Solo ejecutar en MySQL/MariaDB, no en SQLite (usado en tests)
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement('ALTER TABLE usuarios ENGINE = InnoDB');
+        }
     }
 
     /**
