@@ -14,7 +14,7 @@ class CheckUserActivity
     /**
      * Tiempo de inactividad permitido en minutos
      */
-    const INACTIVITY_TIMEOUT_MINUTES = 10;
+    const INACTIVITY_TIMEOUT_MINUTES = 30;
 
     /**
      * Handle an incoming request.

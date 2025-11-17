@@ -27,7 +27,6 @@ const ResultadosAdmin = lazy(() => import('@/pages/admin/resultados'));
 const ConfiguracionAdmin = lazy(() => import('@/pages/admin/configuracion'));
 
 // --- Lazy loading de páginas Docente ---
-const DocenteDashboard = lazy(() => import('@/pages/docente/dashboard'));
 const ExamenesDocente = lazy(() => import('@/pages/docente/examenes'));
 const DetalleExamen = lazy(() => import('@/pages/docente/examenes/DetalleExamen'));
 const TomarExamen = lazy(() => import('@/pages/docente/examenes/TomarExamen'));
@@ -35,6 +34,9 @@ const HistorialDocente = lazy(() => import('@/pages/docente/historial'));
 const Perfil = lazy(() => import('@/pages/profile'));
 const ResultadoIntento = lazy(() => import('@/pages/docente/resultado'));
 const ConfiguracionDocente = lazy(() => import('@/pages/docente/configuracion'));
+
+// --- Componente de redirección por rol ---
+const RoleBasedRedirect = lazy(() => import('@/components/RoleBasedRedirect'));
 
 // Aquí definimos todas las rutas de nuestra aplicación
 const router = createBrowserRouter([
@@ -132,13 +134,7 @@ const router = createBrowserRouter([
     {
         path: '/docente',
         element: <ProtectedRoute requiredRole="1">
-                    <Suspense fallback={<LoadingFallback />}><DocenteDashboard /></Suspense>
-                </ProtectedRoute>,
-    },
-    {
-        path: '/docente/dashboard',
-        element: <ProtectedRoute requiredRole="1">
-                    <Suspense fallback={<LoadingFallback />}><DocenteDashboard /></Suspense>
+                    <Suspense fallback={<LoadingFallback />}><ExamenesDocente /></Suspense>
                 </ProtectedRoute>,
     },
     {
@@ -196,7 +192,7 @@ const router = createBrowserRouter([
     {
         path: '*',
         element: <ProtectedRoute>
-                    <Suspense fallback={<LoadingFallback />}><AdminDashboard /></Suspense>
+                    <Suspense fallback={<LoadingFallback />}><RoleBasedRedirect /></Suspense>
                 </ProtectedRoute>,
     }
 ]);

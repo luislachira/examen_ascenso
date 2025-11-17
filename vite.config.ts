@@ -3,7 +3,6 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
 import path from 'path';
-import fs from 'fs'; // Importamos el módulo 'fs' de Node.js
 
 // La configuración ahora es una función de TypeScript que devuelve un objeto UserConfig
 export default defineConfig(({ command, mode }): UserConfig => {
@@ -11,32 +10,39 @@ export default defineConfig(({ command, mode }): UserConfig => {
     const serverConfig: UserConfig['server'] = {};
 
     if (command === 'serve') {
-        const host = 'localhost';
-        serverConfig.host = host;
+        // Configurar el host explícitamente para evitar problemas con IPv6
+        // Usar 'localhost' en lugar de '0.0.0.0' para evitar problemas de CORS
+        serverConfig.host = 'localhost';
+        serverConfig.strictPort = false;
 
-        // --- ¡LA CLAVE ESTÁ AQUÍ! ---
-        // Esta sección configura el servidor de Hot Module Replacement (HMR)
-        // que es el que sirve los archivos en desarrollo.
-        serverConfig.hmr = {
-            host,
+        // Usar HTTP para desarrollo (Apache maneja HTTPS)
+        // Esto evita problemas de CORS y certificados cuando se accede a través del proxy de Apache
+        // Apache hace proxy de las solicitudes a Vite, por lo que no necesitamos HTTPS en Vite
+        // No definir 'https' significa que Vite usará HTTP
+        console.log('✅ Vite usando HTTP (Apache maneja HTTPS)');
+
+        // Configurar CORS en el servidor para permitir conexiones desde Apache
+        // Permitir todos los orígenes en desarrollo para evitar problemas de CORS
+        serverConfig.cors = {
+            origin: true, // Permitir todos los orígenes en desarrollo
+            credentials: true,
+            methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
         };
-        // Configurar CORS en el servidor
-        serverConfig.cors = true;
 
-        try {
-            serverConfig.https = {
-                key: fs.readFileSync(path.resolve(__dirname, `certs/localhost-key.pem`)),
-                cert: fs.readFileSync(path.resolve(__dirname, `certs/localhost.pem`)),
-            };
-        } catch {
-            console.warn('Advertencia: No se pudieron cargar los certificados SSL. Vite se ejecutará en modo HTTP.');
-        }
+        // HMR deshabilitado (sin WebSocket)
+        serverConfig.hmr = false;
 
+        // Configurar proxy para API
+        // Si usas Apache/WAMP con HTTPS, usa: https://examen_ascenso.com
+        // Si usas php artisan serve, usa: http://localhost:8000
+        const backendUrl = env.VITE_APP_URL || 'https://examen_ascenso.com';
         serverConfig.proxy = {
             '/api': {
-                target: env.VITE_APP_URL || 'http://localhost:8000',
+                target: backendUrl,
                 changeOrigin: true,
-                secure: false,
+                secure: false, // Permitir certificados autofirmados en el backend
+                // Si el backend usa HTTPS con certificado autofirmado, secure debe ser false
             },
         };
     }
@@ -49,6 +55,9 @@ export default defineConfig(({ command, mode }): UserConfig => {
                 // SSR deshabilitado - el proyecto usa React Router, no Inertia
                 // ssr: 'resources/js/ssr.tsx',
                 refresh: true,
+                // Deshabilitar detección automática de Herd/Valet (no disponible en Windows/WAMP)
+                // Configurar manualmente el servidor de desarrollo
+                detectTls: false,
             }),
             react(),
             tailwindcss(),

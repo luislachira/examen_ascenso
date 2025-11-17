@@ -40,7 +40,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: strin
             if (userRole === '0') {
                 return <Navigate to="/admin/dashboard" replace />;
             } else if (userRole === '1') {
-                return <Navigate to="/docente/dashboard" replace />;
+                return <Navigate to="/docente/examenes" replace />;
             }
             return <Navigate to="/unauthorized" replace />;
         }

@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Examen de Ascenso'),
+    'name' => env('APP_NAME', 'I.E. Leonor Cerna de Valdiviezo'),
 
     /*
     |--------------------------------------------------------------------------

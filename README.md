@@ -343,8 +343,3 @@ Institucion Educativa Leonor Cerna de Valdiviezo
 ## 📞 Soporte
 
 Para soporte técnico o consultas, contactar al equipo de desarrollo.
-
----
-
-**Nota**: Asegúrate de revisar el archivo `CHECKLIST_PRODUCCION.md` antes de desplegar a producción.
-
