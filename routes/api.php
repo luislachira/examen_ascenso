@@ -3,30 +3,28 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 
-use App\Http\Controllers\Api\V1\{
-    // Controladores de Administrador
-    Admin\DashboardController as AdminDashboardController,
-    Admin\UsuarioController as AdminUsuarioController,
-    Admin\CategoriaController as AdminCategoriaController,
-    Admin\ContextoController as AdminContextoController,
-    Admin\PreguntaController as AdminPreguntaController,
-    Admin\TipoConcursoController as AdminTipoConcursoController,
-    Admin\ExamenController as AdminExamenController,
-    Admin\SubpruebaController as AdminSubpruebaController,
-    Admin\PostulacionController as AdminPostulacionController,
-    Admin\ReglaPuntajeController as AdminReglaPuntajeController,
-    Admin\ResultadoController as AdminResultadoController,
-    Admin\ArchivoController as AdminArchivoController,
-    // Controladores de Docente
-    Docente\DashboardController as DocenteDashboardController,
-    Docente\ExamenController as DocenteExamenController,
-    Docente\IntentoController as DocenteIntentoController,
-    // --- Controladores ---
-    AuthController,
-    OAuthController,
-    ForgotPasswordController,
-    ProfileController,
-};
+// Controladores de Administrador
+use App\Http\Controllers\Api\V1\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Api\V1\Admin\UsuarioController as AdminUsuarioController;
+use App\Http\Controllers\Api\V1\Admin\CategoriaController as AdminCategoriaController;
+use App\Http\Controllers\Api\V1\Admin\ContextoController as AdminContextoController;
+use App\Http\Controllers\Api\V1\Admin\PreguntaController as AdminPreguntaController;
+use App\Http\Controllers\Api\V1\Admin\TipoConcursoController as AdminTipoConcursoController;
+use App\Http\Controllers\Api\V1\Admin\ExamenController as AdminExamenController;
+use App\Http\Controllers\Api\V1\Admin\SubpruebaController as AdminSubpruebaController;
+use App\Http\Controllers\Api\V1\Admin\PostulacionController as AdminPostulacionController;
+use App\Http\Controllers\Api\V1\Admin\ReglaPuntajeController as AdminReglaPuntajeController;
+use App\Http\Controllers\Api\V1\Admin\ResultadoController as AdminResultadoController;
+use App\Http\Controllers\Api\V1\Admin\ArchivoController as AdminArchivoController;
+// Controladores de Docente
+use App\Http\Controllers\Api\V1\Docente\DashboardController as DocenteDashboardController;
+use App\Http\Controllers\Api\V1\Docente\ExamenController as DocenteExamenController;
+use App\Http\Controllers\Api\V1\Docente\IntentoController as DocenteIntentoController;
+// Controladores de Autenticación
+use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\OAuthController;
+use App\Http\Controllers\Api\V1\ForgotPasswordController;
+use App\Http\Controllers\Api\V1\ProfileController;
 
 /*
 |--------------------------------------------------------------------------
