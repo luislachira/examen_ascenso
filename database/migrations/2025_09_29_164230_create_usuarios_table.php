@@ -14,9 +14,8 @@ return new class extends Migration
     {
         Schema::create('usuarios', function (Blueprint $table) {
             $table->increments('idUsuario');
-            $table->string('dni', 8)->unique();
             $table->string('nombre', 200);
-            $table->string('apellidos', 250);
+            $table->string('apellidos',250);
             $table->string('correo', 250)->unique('correo');
             $table->string('password', 200);
             $table->enum('rol', ['0', '1']);

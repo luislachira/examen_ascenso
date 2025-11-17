@@ -11,77 +11,53 @@ class Pregunta extends Model
 
     protected $table = 'preguntas';
     protected $primaryKey = 'idPregunta';
-    public $timestamps = false;
+    public $incrementing = true;
 
     protected $fillable = [
+        'idContexto',
         'idCategoria',
+        'codigo',
         'enunciado',
-        'tipoPregunta',
-        'adminRegistro', // Considera cambiar esto a 'creado_por_id_usuario'
-        'fechaRegistro',
+        'ano',
     ];
 
     protected $casts = [
+        'idContexto' => 'integer',
         'idCategoria' => 'integer',
-        'tipoPregunta' => 'string',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
+        'ano' => 'integer',
     ];
 
-    /**
-     * Define la relación inversa: Una Pregunta pertenece a una Categoria.
-     */
+    // Relaciones
     public function categoria()
     {
         return $this->belongsTo(Categoria::class, 'idCategoria', 'idCategoria');
     }
 
-    /**
-     * Define la relación: Una Pregunta tiene muchas Opciones.
-     */
+    public function contexto()
+    {
+        return $this->belongsTo(Contexto::class, 'idContexto', 'idContexto');
+    }
+
     public function opciones()
     {
-        return $this->hasMany(Opcion::class, 'idPregunta', 'idPregunta');
+        return $this->hasMany(OpcionesPregunta::class, 'idPregunta', 'idPregunta');
     }
 
-    /**
-     * Define la relación muchos a muchos: Una Pregunta puede estar en muchos Examenes.
-     */
+    public function respuestas()
+    {
+        return $this->hasMany(RespuestaIntento::class, 'idPregunta', 'idPregunta');
+    }
+
     public function examenes()
     {
-        return $this->belongsToMany(Examen::class, 'examen_pregunta', 'idPregunta', 'idExamen');
+        return $this->belongsToMany(Examen::class, 'examen_pregunta', 'idPregunta', 'idExamen')
+            ->withPivot('orden', 'idSubprueba')
+            ->withTimestamps();
     }
 
-    // Accessors
-    public function getTipoPreguntaNameAttribute()
+    public function archivosAdjuntos()
     {
-        return $this->tipoPregunta === '0' ? 'Única respuesta' : 'Múltiple respuesta';
-    }
-
-    // Scopes
-    public function scopePorCategoria($query, $idCategoria)
-    {
-        return $query->where('idCategoria', $idCategoria);
-    }
-
-    public function scopeUnicaRespuesta($query)
-    {
-        return $query->where('tipoPregunta', '0');
-    }
-
-    public function scopeMultipleRespuesta($query)
-    {
-        return $query->where('tipoPregunta', '1');
-    }
-
-    // Métodos auxiliares
-    public function isMultipleRespuesta()
-    {
-        return $this->tipoPregunta === '1';
-    }
-
-    public function getOpcionesCorrectasIds()
-    {
-        return $this->opciones()->where('esCorrecta', true)->pluck('idOpciones')->toArray();
+        return $this->hasMany(ArchivoAdjunto::class, 'id_recurso', 'idPregunta')
+            ->where('tipo_recurso', 'pregunta_enunciado');
     }
 }

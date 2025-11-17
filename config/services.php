@@ -49,4 +49,5 @@ return [
         'tenant' => env('MICROSOFT_TENANT', 'common'),
     ],
 
+
 ];

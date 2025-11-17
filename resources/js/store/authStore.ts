@@ -1,75 +1,21 @@
 import clienteApi from '../api/clienteApi';
 
-export type RolUsuario = '0' | '1'; // '0' admin, '1' docente
-
+// --- Interfaces y Tipos ---
 export interface UsuarioDTO {
-    id: number;
-    dni: string;
+    idUsuario: number;
     nombre: string;
     apellidos: string;
     correo: string;
-    rol: RolUsuario;
+    rol: '0' | '1';
 }
 
 interface AuthState {
-    token: string | null;
     user: UsuarioDTO | null;
+    token: string | null;
+    isInitialized: boolean; // <-- NUEVO: Para saber si ya se verificó la sesión inicial
 }
 
-// Suscripción estilo useSyncExternalStore
-type Listener = () => void;
-
-const STORAGE_KEY = 'auth_state_v1';
-
-const authState: AuthState = loadState();
-const listeners: Listener[] = [];
-
-function loadState(): AuthState {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return { token: null, user: null };
-        const parsed = JSON.parse(raw);
-        return { token: parsed.token ?? null, user: parsed.user ?? null } as AuthState;
-    } catch {
-        return { token: null, user: null };
-    }
-}
-
-function persist() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(authState));
-}
-
-function notify() {
-    listeners.forEach((l) => l());
-}
-
-export const authStore = {
-    getState(): AuthState {
-        return authState;
-    },
-    subscribe(listener: Listener): () => void {
-        listeners.push(listener);
-        return () => {
-            const idx = listeners.indexOf(listener);
-            if (idx >= 0) listeners.splice(idx, 1);
-        };
-    },
-    setTokenAndUser(token: string, user: UsuarioDTO) {
-        authState.token = token;
-        authState.user = user;
-        persist();
-        notify();
-    },
-    clear() {
-        authState.token = null;
-        authState.user = null;
-        persist();
-        notify();
-    },
-};
-
-// Helpers de API
-export interface LoginData {
+export interface LoginCredentials {
     correo: string;
     password: string;
 }
@@ -77,34 +23,149 @@ export interface LoginData {
 export interface RegisterData {
     nombre: string;
     apellidos: string;
-    dni: string;
     correo: string;
     password: string;
     password_confirmation: string;
 }
 
-export async function apiLogin(data: LoginData) {
-    const res = await clienteApi.post('/login', data);
-    const { access_token, usuario } = res.data;
-    authStore.setTokenAndUser(access_token, {
-        id: usuario.id,
-        dni: usuario.dni,
-        nombre: usuario.nombre,
-        apellidos: usuario.apellidos,
-        correo: usuario.correo,
-        rol: usuario.rol,
-    });
+// --- Implementación del Store ---
+
+const STORAGE_KEY = 'auth_state_v1';
+
+// El estado ahora comienza como "no inicializado".
+let state: AuthState = {
+    user: null,
+    token: null,
+    isInitialized: false,
+};
+
+const listeners = new Set<() => void>();
+
+const emitChange = () => {
+    listeners.forEach(listener => listener());
 }
 
-export async function apiLogout() {
+function persistState() {
+    // Solo guardamos el usuario y el token, no el estado de inicialización.
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ user: state.user, token: state.token }));
+}
+
+// --- ¡NUEVA FUNCIÓN DE INICIALIZACIÓN! ---
+/**
+ * Se debe llamar una sola vez al arrancar la aplicación.
+ * Carga el estado desde localStorage y marca la autenticación como "inicializada".
+ */
+// --- Inicialización con validación de token ---
+export async function initializeAuth() {
     try {
-        await clienteApi.post('/logout');
-    } catch {
-        // Ignore logout errors
+        const rawState = localStorage.getItem(STORAGE_KEY);
+
+        if (!rawState || rawState === 'undefined') {
+            state = { user: null, token: null, isInitialized: true };
+            emitChange();
+            return;
+        }
+
+        const parsed = JSON.parse(rawState);
+        const token = parsed.token;
+
+        if (!token) {
+            state = { user: null, token: null, isInitialized: true };
+            emitChange();
+            return;
+        }
+
+        try {
+            // Verificar si el token sigue siendo válido
+            const response = await clienteApi.get<UsuarioDTO>('/user', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            state = {
+                user: response.data,
+                token: token,
+                isInitialized: true,
+            };
+            persistState();
+        } catch (error: unknown) {
+            // Token inválido: limpiar todo
+            localStorage.removeItem(STORAGE_KEY);
+            state = { user: null, token: null, isInitialized: true };
+        }
+    } catch (error: unknown) {
+        state = { user: null, token: null, isInitialized: true };
     }
-    authStore.clear();
+
+    emitChange();
 }
 
-export async function apiRegister(data: RegisterData): Promise<void> {
-    await clienteApi.post('/register', data);
-}
+// --- Store ---
+export const authStore = {
+    subscribe(listener: () => void) {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+    },
+    getState() {
+        return state;
+    },
+    setState(newState: Partial<AuthState>) {
+        state = { ...state, ...newState };
+        persistState();
+        emitChange();
+    },
+    clear() {
+        state = { token: null, user: null, isInitialized: true };
+        localStorage.removeItem(STORAGE_KEY);
+        emitChange();
+    }
+};
+
+// --- Funciones de API ---
+export const apiLogin = async (credentials: LoginCredentials) => {
+    try {
+        const response = await clienteApi.post('/login', credentials);
+        const { access_token, usuario } = response.data;
+
+        // Actualizar estado
+        state = {
+            token: access_token,
+            user: usuario,
+            isInitialized: true
+        };
+
+        // Persistir inmediatamente
+        persistState();
+
+        // Emitir cambios
+        emitChange();
+
+        // Pequeño delay para asegurar que el estado se propague
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        return { access_token, usuario };
+    } catch (error: unknown) {
+        throw error;
+    }
+};
+
+export const apiRegister = async (data: RegisterData) => {
+    return await clienteApi.post('/register', data);
+};
+
+export const apiLogout = async () => {
+    const token = state.token;
+
+    // Notificar al backend ANTES de limpiar el estado
+    if (token) {
+        try {
+            await clienteApi.post('/logout', {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+        } catch (error: unknown) {
+            // Continuar con el logout local aunque falle el backend
+        }
+    }
+
+    // Limpiar el estado local
+    authStore.clear();
+};

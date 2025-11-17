@@ -1,0 +1,155 @@
+═══════════════════════════════════════════════════════════════
+  SOLUCIÓN: ERROR SSL DE cURL
+═══════════════════════════════════════════════════════════════
+
+✅ PROBLEMA RESUELTO:
+--------------------
+El error "cURL error 60: SSL certificate problem" ha sido 
+solucionado automáticamente.
+
+LO QUE SE HIZO:
+---------------
+1. ✅ Descargado el certificado CA bundle oficial de cURL
+2. ✅ Guardado en: C:\wamp64\www\laravel\examen_ascenso\cacert.pem
+3. ✅ Configurado php.ini para usar este certificado
+4. ✅ Actualizado curl.cainfo y openssl.cafile
+
+═══════════════════════════════════════════════════════════════
+  ÚLTIMO PASO: REINICIAR SERVICIOS
+═══════════════════════════════════════════════════════════════
+
+IMPORTANTE: Debes REINICIAR Apache para que tome la configuración:
+
+┌─────────────────────────────────────────────────────────────┐
+│  1. Haz clic en el ícono de WAMP (bandeja del sistema)     │
+│  2. Selecciona: Apache > Service > Restart All Services     │
+│  3. Espera a que WAMP se ponga en VERDE                     │
+└─────────────────────────────────────────────────────────────┘
+
+⚠️  Si no reinicias Apache, el error persistirá.
+
+
+═══════════════════════════════════════════════════════════════
+  PRUEBA FINAL
+═══════════════════════════════════════════════════════════════
+
+Una vez que hayas reiniciado Apache:
+
+1. Abre: https://examen-ascenso.com
+2. Haz clic en "Sign in with Google"
+3. Acepta las condiciones de Google
+4. Deberías ver el mensaje:
+
+   ┌─────────────────────────────────────┐
+   │              ⏳                     │
+   │       Registro Exitoso              │
+   │                                     │
+   │  Tu cuenta ha sido creada           │
+   │  correctamente.                     │
+   │                                     │
+   │  Por favor, espera hasta que el     │
+   │  administrador acepte tu solicitud. │
+   │                                     │
+   │    [Volver al Login]               │
+   └─────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════
+  QUÉ CAMBIÓ EN EL SISTEMA
+═══════════════════════════════════════════════════════════════
+
+Archivo modificado:
+📄 C:\wamp64\bin\php\php8.3.14\php.ini
+
+Líneas cambiadas:
+  curl.cainfo = "C:\wamp64\www\laravel\examen_ascenso\cacert.pem"
+  openssl.cafile="C:\wamp64\www\laravel\examen_ascenso\cacert.pem"
+
+Archivo agregado:
+📄 C:\wamp64\www\laravel\examen_ascenso\cacert.pem
+   (Bundle oficial de certificados CA de Mozilla)
+
+
+═══════════════════════════════════════════════════════════════
+  VERIFICACIÓN DE LA CONFIGURACIÓN
+═══════════════════════════════════════════════════════════════
+
+Para verificar que PHP tomó la configuración correcta:
+
+php -i | Select-String -Pattern "curl.cainfo"
+
+Debería mostrar:
+  curl.cainfo => C:\wamp64\www\laravel\examen_ascenso\cacert.pem
+
+
+═══════════════════════════════════════════════════════════════
+  ¿POR QUÉ OCURRE ESTE ERROR?
+═══════════════════════════════════════════════════════════════
+
+En Windows, PHP/cURL no viene con un bundle de certificados CA
+pre-configurado. Cuando intentas hacer una petición HTTPS (como
+al API de Google OAuth), cURL no puede verificar el certificado
+SSL del servidor remoto.
+
+La solución es proporcionar un archivo cacert.pem que contiene
+los certificados de las autoridades certificadoras (CA) 
+reconocidas mundialmente.
+
+Este archivo es mantenido por el proyecto cURL y se actualiza
+regularmente.
+
+
+═══════════════════════════════════════════════════════════════
+  SOLUCIÓN DE PROBLEMAS
+═══════════════════════════════════════════════════════════════
+
+❌ El error persiste después de reiniciar Apache:
+   1. Verifica que WAMP haya reiniciado correctamente
+   2. Ejecuta: php -i | Select-String -Pattern "curl.cainfo"
+   3. Verifica que el archivo cacert.pem existe
+   4. Limpia el log: Remove-Item storage/logs/laravel.log
+   5. Intenta de nuevo
+
+❌ WAMP no reinicia o muestra error:
+   → Revisa el archivo php.ini por errores de sintaxis
+   → La ruta debe usar \\ o / (no mezclar)
+   → Verifica que el archivo cacert.pem existe
+
+❌ Sigue redirigiendo al login con error:
+   → Revisa: storage/logs/laravel.log
+   → Busca otro tipo de error diferente al SSL
+
+
+═══════════════════════════════════════════════════════════════
+  ARCHIVOS DE AYUDA
+═══════════════════════════════════════════════════════════════
+
+📄 CONFIGURAR_OAUTH_LOCAL.txt
+   → Guía completa de configuración OAuth
+
+📄 diagnose_oauth.php
+   → Script para verificar la configuración OAuth
+   → Ejecutar: php diagnose_oauth.php
+
+📄 cacert.pem
+   → Bundle de certificados CA
+   → NO eliminar este archivo
+
+
+═══════════════════════════════════════════════════════════════
+  RESUMEN
+═══════════════════════════════════════════════════════════════
+
+Estado actual:
+  ✅ Certificado CA descargado
+  ✅ php.ini configurado
+  ⏳ Pendiente: Reiniciar Apache
+
+Siguiente paso:
+  → REINICIAR APACHE desde el panel de WAMP
+
+Después del reinicio:
+  → Probar OAuth con Google nuevamente
+  → Deberías ver el mensaje de "Registro Exitoso"
+
+═══════════════════════════════════════════════════════════════

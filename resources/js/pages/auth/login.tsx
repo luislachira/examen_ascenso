@@ -1,8 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
-import '@res/css/Login.css';
-import logo from '../assets/logo_leonor_cerna 2.png';
+import '@css/Login.css';
+import logo from '@img/logo_leonor_cerna 2.png';
 import { useAuth } from '../../hooks/useAuth';
+
+// --- Interfaces y Tipos ---
+interface ApiError {
+    response?: {
+        data?: {
+            message?: string;
+        };
+    };
+}
 
 // --- Iconos SVG para los botones de OAuth ---
 const GoogleIcon = () => (
@@ -23,38 +34,38 @@ const MicrosoftIcon = () => (
     </svg>
 );
 
-interface ApiError {
-    response?: {
-        data?: {
-            message?: string;
-        };
-    };
-}
-
 const Login: React.FC = () => {
-    const { login } = useAuth();
+    const { login, isAuthenticated } = useAuth();
+    const navigate = useNavigate();
     const [correo, setCorreo] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const onSubmit = async (e: React.FormEvent) => {
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate('/dashboard', { replace: true });
+        }
+    }, [isAuthenticated, navigate]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
         setLoading(true);
         try {
-            await login(correo, password);
-            window.location.href = '/admin/dashboard';
+            await login({ correo, password });
+            // La redirección ahora es manejada por el useEffect
         } catch (err: unknown) {
-            const error = err as ApiError;
-            setError(error?.response?.data?.message || 'Error al iniciar sesión');
+            const apiError = err as ApiError;
+            setError(apiError?.response?.data?.message || 'Error al iniciar sesión.');
         } finally {
             setLoading(false);
         }
     };
 
     const oauthLogin = (provider: 'google' | 'microsoft') => {
-        window.location.href = `/oauth/redirect/${provider}`;
+        // En una API, la redirección a OAuth debe ser manejada por el backend
+        window.location.href = `/api/v1/oauth/redirect/${provider}`;
     };
 
     return (
@@ -64,42 +75,48 @@ const Login: React.FC = () => {
                     <img src={logo} alt="Logo I.E. Leonor Cerna de Valdiviezo" />
                     <h2>I.E. LEONOR CERNA DE VALDIVIEZO</h2>
                 </div>
-                <form className="login-form" onSubmit={onSubmit}>
+                <form className="login-form" onSubmit={handleSubmit}>
                     <div className="input-group">
                         <label htmlFor="correo">Correo</label>
-                        <input 
-                            type="email" 
-                            id="correo" 
-                            name="correo" 
-                            required 
-                            value={correo} 
-                            onChange={(e)=>setCorreo(e.target.value)} 
+                        <input
+                            type="email"
+                            id="correo"
+                            name="correo"
+                            placeholder="tu.correo@ejemplo.com"
+                            value={correo}
+                            onChange={(e) => setCorreo(e.target.value)}
+                            required
+                            disabled={loading}
                         />
                     </div>
                     <div className="input-group">
                         <label htmlFor="password">Contraseña</label>
-                        <input 
-                            type="password" 
-                            id="password" 
-                            name="password" 
-                            required 
-                            value={password} 
-                            onChange={(e)=>setPassword(e.target.value)} 
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            placeholder="••••••••"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                            disabled={loading}
                         />
                     </div>
+
                     {error && <div className="error-message">{error}</div>}
+                    <div className="form-options">
+                        <Link to="/forgot-password" className="btn-link">¿Olvidaste tu contraseña?</Link>
+                    </div>
+
                     <button type="submit" className="btn btn-primary" disabled={loading}>
                         {loading ? 'Ingresando...' : 'Iniciar Sesión'}
                     </button>
-                    <button 
-                        type="button" 
-                        className="btn btn-secondary"
-                        onClick={() => window.location.href = '/register'}
-                    >
-                        Registrar
-                    </button>
+                    {/* --- Navegación Corregida --- */}
+                    <Link to="/register" className="btn btn-secondary-link">
+                        ¿No tienes una cuenta? Regístrate
+                    </Link>
                 </form>
-                
+
                 <div className="oauth-section">
                     <div className="oauth-divider">
                         <span>or</span>

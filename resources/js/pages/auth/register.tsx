@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import '@res/css/LoginPage.css';
-import logo from '../../assets/logo_leonor_cerna 2.png';
+import { Link, useNavigate } from 'react-router-dom';
+import '@css/Login.css';
+import logo from '@/assets/logo_leonor_cerna 2.png';
 import { useAuth } from '../../hooks/useAuth';
 import { RegisterData } from '../../store/authStore';
 
 const Register: React.FC = () => {
     const { register } = useAuth();
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const [formData, setFormData] = useState<RegisterData>({
         nombre: '',
         apellidos: '',
-        dni: '',
         correo: '',
         password: '',
         password_confirmation: ''
@@ -31,15 +33,74 @@ const Register: React.FC = () => {
 
         try {
             await register(formData);
-            alert('Registro exitoso, espere hasta que el administrador acepte su solicitud');
-            window.location.href = '/login';
-        } catch (err) {
+            setShowSuccessMessage(true);
+        } catch (err: unknown) {
             const error = err as { response?: { data?: { message?: string } } };
             setError(error?.response?.data?.message || 'Error al registrar usuario');
         } finally {
             setLoading(false);
         }
     };
+
+    // Mostrar mensaje de éxito
+    if (showSuccessMessage) {
+        return (
+            <div className="login-container">
+                <div className="login-box" style={{ textAlign: 'center' }}>
+                    <div className="login-header">
+                        <img src={logo} alt="Logo I.E. Leonor Cerna de Valdiviezo" />
+                        <h2>I.E. LEONOR CERNA DE VALDIVIEZO</h2>
+                    </div>
+                    <div style={{
+                        padding: '2rem 1rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1.5rem',
+                        alignItems: 'center'
+                    }}>
+                        <div style={{
+                            fontSize: '3rem',
+                            color: '#f7b731'
+                        }}>
+                            ⏳
+                        </div>
+                        <h3 style={{
+                            margin: 0,
+                            color: '#333',
+                            fontSize: '1.25rem',
+                            fontWeight: '600'
+                        }}>
+                            Registro Exitoso
+                        </h3>
+                        <p style={{
+                            margin: 0,
+                            color: '#555',
+                            fontSize: '1rem',
+                            lineHeight: '1.6'
+                        }}>
+                            Tu cuenta ha sido creada correctamente.
+                        </p>
+                        <p style={{
+                            margin: 0,
+                            color: '#555',
+                            fontSize: '1rem',
+                            lineHeight: '1.6',
+                            fontWeight: '500'
+                        }}>
+                            Por favor, espera hasta que el administrador acepte tu solicitud.
+                        </p>
+                        <button
+                            onClick={() => navigate('/login')}
+                            className="btn btn-primary"
+                            style={{ marginTop: '1rem', maxWidth: '250px' }}
+                        >
+                            Volver al Login
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="login-container">
@@ -68,19 +129,6 @@ const Register: React.FC = () => {
                             name="apellidos"
                             required
                             value={formData.apellidos}
-                            onChange={handleChange}
-                        />
-                    </div>
-                    <div className="input-group">
-                        <label htmlFor="dni">DNI</label>
-                        <input
-                            type="text"
-                            id="dni"
-                            name="dni"
-                            required
-                            pattern="[0-9]{8}"
-                            title="DNI debe tener 8 dígitos"
-                            value={formData.dni}
                             onChange={handleChange}
                         />
                     </div>
@@ -123,13 +171,9 @@ const Register: React.FC = () => {
                     <button type="submit" className="btn btn-primary" disabled={loading}>
                         {loading ? 'Registrando...' : 'Registrar'}
                     </button>
-                    <button 
-                        type="button" 
-                        className="btn btn-secondary" 
-                        onClick={() => window.location.href = '/login'}
-                    >
+                    <Link to="/login" className="btn btn-secondary">
                         Volver al Login
-                    </button>
+                    </Link>
                 </form>
             </div>
         </div>

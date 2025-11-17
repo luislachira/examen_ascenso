@@ -1,0 +1,256 @@
+═══════════════════════════════════════════════════════════════
+  ESCENARIOS DE PRUEBA - OAUTH GOOGLE/MICROSOFT
+═══════════════════════════════════════════════════════════════
+
+✅ MEJORAS APLICADAS:
+--------------------
+1. Diferenciación entre registro nuevo y login existente
+2. Manejo correcto de estados (Activo, Pendiente, Suspendido)
+3. Logging detallado para debugging
+4. Mensajes personalizados según el caso
+
+
+═══════════════════════════════════════════════════════════════
+  ESCENARIO 1: USUARIO NUEVO (Primera vez con Google)
+═══════════════════════════════════════════════════════════════
+
+PASOS:
+------
+1. Abre: https://examen-ascenso.com
+2. Haz clic en "Sign in with Google"
+3. Selecciona una cuenta de Google que NUNCA has usado antes
+
+RESULTADO ESPERADO:
+-------------------
+✅ Usuario se crea en BD con estado PENDIENTE ('2')
+✅ Se muestra el mensaje elegante:
+
+   ┌─────────────────────────────────────┐
+   │              ⏳                     │
+   │       Registro Exitoso              │
+   │                                     │
+   │  Tu cuenta ha sido creada           │
+   │  correctamente.                     │
+   │                                     │
+   │  Por favor, espera hasta que el     │
+   │  administrador acepte tu solicitud. │
+   │                                     │
+   │    [Volver al Login]               │
+   └─────────────────────────────────────┘
+
+VERIFICACIÓN:
+-------------
+php check_usuarios.php
+
+Deberías ver el nuevo usuario con:
+  🟡 Estado: PENDIENTE
+
+
+═══════════════════════════════════════════════════════════════
+  ESCENARIO 2: USUARIO EXISTENTE PENDIENTE
+═══════════════════════════════════════════════════════════════
+
+PASOS:
+------
+1. Cierra sesión de Google en el navegador
+2. Ve a: https://examen-ascenso.com
+3. Haz clic en "Sign in with Google"
+4. Usa la MISMA cuenta de Google del Escenario 1
+
+RESULTADO ESPERADO:
+-------------------
+✅ Sistema detecta que el usuario ya existe
+✅ Verifica que está en estado PENDIENTE
+✅ Se muestra el MISMO mensaje elegante:
+
+   "Espera que el administrador acepte tu solicitud"
+
+❌ NO crea un usuario duplicado
+❌ NO permite acceso al dashboard
+
+
+═══════════════════════════════════════════════════════════════
+  ESCENARIO 3: USUARIO ACTIVO (Aprobado por admin)
+═══════════════════════════════════════════════════════════════
+
+PREPARACIÓN:
+------------
+1. Aprobar al usuario manualmente:
+
+   php artisan tinker --execute="
+   \$user = App\Models\Usuario::where('correo', 'TU_EMAIL@gmail.com')->first();
+   \$user->estado = '1';
+   \$user->save();
+   echo 'Usuario aprobado';
+   "
+
+PASOS:
+------
+1. Cierra sesión de Google en el navegador
+2. Ve a: https://examen-ascenso.com
+3. Haz clic en "Sign in with Google"
+4. Usa la misma cuenta de Google
+
+RESULTADO ESPERADO:
+-------------------
+✅ Sistema detecta que el usuario existe y está ACTIVO
+✅ Genera un token de autenticación
+✅ Redirige DIRECTAMENTE al dashboard
+✅ NO muestra el mensaje de "espera aprobación"
+
+VERIFICACIÓN:
+-------------
+- Deberías estar dentro del sistema
+- Deberías ver el dashboard según tu rol
+
+
+═══════════════════════════════════════════════════════════════
+  ESCENARIO 4: USUARIO SUSPENDIDO
+═══════════════════════════════════════════════════════════════
+
+PREPARACIÓN:
+------------
+1. Suspender al usuario manualmente:
+
+   php artisan tinker --execute="
+   \$user = App\Models\Usuario::where('correo', 'TU_EMAIL@gmail.com')->first();
+   \$user->estado = '0';
+   \$user->save();
+   echo 'Usuario suspendido';
+   "
+
+PASOS:
+------
+1. Cierra sesión de Google en el navegador
+2. Ve a: https://examen-ascenso.com
+3. Haz clic en "Sign in with Google"
+4. Usa la misma cuenta de Google
+
+RESULTADO ESPERADO:
+-------------------
+✅ Sistema detecta que el usuario está SUSPENDIDO
+✅ NO permite acceso
+✅ Redirige al login con mensaje de error:
+
+   "Su cuenta ha sido suspendida. Contacte al administrador."
+
+❌ NO genera token
+❌ NO muestra mensaje de "espera aprobación"
+
+
+═══════════════════════════════════════════════════════════════
+  ESCENARIO 5: MÚLTIPLES REGISTROS (Google y Microsoft)
+═══════════════════════════════════════════════════════════════
+
+PASOS:
+------
+1. Registrarse con Google (usuario1@gmail.com)
+2. Ver mensaje de espera
+3. Hacer clic en "Volver al Login"
+4. Registrarse con Microsoft (usuario2@outlook.com)
+5. Ver mensaje de espera
+
+RESULTADO ESPERADO:
+-------------------
+✅ Cada cuenta crea un usuario diferente
+✅ Ambos con estado PENDIENTE
+✅ Ambos muestran el mensaje de espera
+✅ NO hay conflictos entre proveedores
+
+
+═══════════════════════════════════════════════════════════════
+  VERIFICACIÓN DE LOGS
+═══════════════════════════════════════════════════════════════
+
+Para ver qué está pasando internamente:
+
+Get-Content "C:\wamp64\www\laravel\examen_ascenso\storage\logs\laravel.log" -Wait -Tail 30
+
+Deberías ver logs como:
+
+✅ Usuario nuevo:
+   - "Nuevo usuario creado via OAuth"
+   - es_nuevo: true
+   - estado: 2
+
+✅ Usuario existente:
+   - "Usuario existente encontrado"
+   - es_nuevo: false
+   - estado: (el que tenga)
+
+✅ Login exitoso:
+   - "Login exitoso con OAuth"
+   - Token generado
+
+✅ Cuenta pendiente:
+   - "Usuario con cuenta pendiente"
+
+
+═══════════════════════════════════════════════════════════════
+  COMANDOS ÚTILES
+═══════════════════════════════════════════════════════════════
+
+# Ver usuarios registrados
+php check_usuarios.php
+
+# Aprobar un usuario específico
+php artisan tinker --execute="
+App\Models\Usuario::where('correo', 'EMAIL')->update(['estado' => '1']);
+echo 'Usuario aprobado';
+"
+
+# Suspender un usuario
+php artisan tinker --execute="
+App\Models\Usuario::where('correo', 'EMAIL')->update(['estado' => '0']);
+echo 'Usuario suspendido';
+"
+
+# Ver logs en tiempo real
+Get-Content storage\logs\laravel.log -Wait -Tail 50
+
+
+═══════════════════════════════════════════════════════════════
+  RESUMEN DE ESTADOS
+═══════════════════════════════════════════════════════════════
+
+Estado '0' (SUSPENDIDO):
+  - ❌ NO puede iniciar sesión
+  - ⚠️ Mensaje: "Cuenta suspendida"
+  - 🔴 Icono: Rojo
+
+Estado '1' (ACTIVO):
+  - ✅ Puede iniciar sesión
+  - ✅ Accede directamente al dashboard
+  - 🟢 Icono: Verde
+
+Estado '2' (PENDIENTE):
+  - ❌ NO puede iniciar sesión
+  - ⏳ Mensaje: "Espera aprobación"
+  - 🟡 Icono: Amarillo
+
+
+═══════════════════════════════════════════════════════════════
+  ¿PROBLEMAS?
+═══════════════════════════════════════════════════════════════
+
+Si algo no funciona como esperado:
+
+1. Revisa los logs:
+   storage\logs\laravel.log
+
+2. Verifica la base de datos:
+   php check_usuarios.php
+
+3. Confirma el estado del usuario:
+   php artisan tinker --execute="
+   App\Models\Usuario::where('correo', 'EMAIL')
+     ->get(['idUsuario','correo','estado'])
+   "
+
+4. Limpia la sesión de OAuth:
+   - Cierra sesión de Google/Microsoft en el navegador
+   - Borra cookies de examen-ascenso.com
+   - Intenta de nuevo
+
+
+═══════════════════════════════════════════════════════════════

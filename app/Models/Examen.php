@@ -11,149 +11,331 @@ class Examen extends Model
 
     protected $table = 'examenes';
     protected $primaryKey = 'idExamen';
+    public $incrementing = true;
+
     /**
-     * Indica si el modelo debe tener timestamps.
-     * En tu migración no usaste timestamps(), por lo que lo desactivamos.
-     * @var bool
+     * Get the route key for the model.
+     * Esto permite que Laravel use idExamen en lugar de id para el route model binding
      */
-    public $timestamps = false;
+    public function getRouteKeyName()
+    {
+        return 'idExamen';
+    }
 
     protected $fillable = [
-        'idUsuario',
+        'idTipoConcurso',
+        'codigo_examen',
         'titulo',
         'descripcion',
-        'fechaCreacion',
-        'fechaInicio',
-        'fechaFin',
-        'duracionMin',
+        'tiempo_limite',
+        'tipo_acceso',
         'estado',
-        'tipo_seleccion',
-        'numero_preguntas_aleatorias',
+        'paso_actual',
+        'fecha_inicio_vigencia',
+        'fecha_fin_vigencia',
+        'fecha_publicacion',
+        'fecha_finalizacion',
+        'idUsuarioAdmin',
     ];
 
     protected $casts = [
-        'idUsuario' => 'integer',
-        'fechaCreacion' => 'datetime',
-        'fechaInicio' => 'datetime',
-        'fechaFin' => 'datetime',
-        'duracionMin' => 'integer',
-        'estado' => 'string',
-        'tipo_seleccion' => 'string',
-        'numero_preguntas_aleatorias' => 'integer',
+        'idTipoConcurso' => 'integer',
+        'tiempo_limite' => 'integer',
+        'paso_actual' => 'integer',
+        'fecha_publicacion' => 'datetime',
+        'fecha_finalizacion' => 'datetime',
+        // No usar 'datetime' cast para fechas de vigencia para evitar conversiones automáticas de zona horaria
+        // Se manejarán manualmente para mantener las fechas fijas
     ];
 
     /**
-     * Define la relación inversa: Un Examen pertenece a un Usuario (el creador).
+     * Accessor para fecha_inicio_vigencia
+     * Devuelve la fecha tal como está en la base de datos sin conversión de zona horaria
      */
-    public function creador()
+    public function getFechaInicioVigenciaAttribute($value)
     {
-        return $this->belongsTo(Usuario::class, 'idUsuario', 'idUsuario');
+        if (!$value) {
+            return null;
+        }
+        // Si ya es una instancia de Carbon, retornarla directamente
+        if ($value instanceof \Carbon\Carbon) {
+            return $value->setTimezone('UTC');
+        }
+        // Parsear como string y retornar en UTC para evitar conversiones
+        try {
+            // Intentar primero con el formato esperado
+            return \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $value, 'UTC')->setTimezone('UTC');
+        } catch (\Exception $e) {
+            // Si falla, intentar parsear con Carbon::parse que es más flexible
+            try {
+                return \Carbon\Carbon::parse($value)->setTimezone('UTC');
+            } catch (\Exception $e2) {
+                // Si todo falla, retornar null
+                return null;
+            }
+        }
     }
 
     /**
-     * Relación para exámenes MANUALES: Un Examen tiene muchas Preguntas fijas.
+     * Accessor para fecha_fin_vigencia
+     * Devuelve la fecha tal como está en la base de datos sin conversión de zona horaria
      */
+    public function getFechaFinVigenciaAttribute($value)
+    {
+        if (!$value) {
+            return null;
+        }
+        // Si ya es una instancia de Carbon, retornarla directamente
+        if ($value instanceof \Carbon\Carbon) {
+            return $value->setTimezone('UTC');
+        }
+        // Parsear como string y retornar en UTC para evitar conversiones
+        try {
+            // Intentar primero con el formato esperado
+            return \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $value, 'UTC')->setTimezone('UTC');
+        } catch (\Exception $e) {
+            // Si falla, intentar parsear con Carbon::parse que es más flexible
+            try {
+                return \Carbon\Carbon::parse($value)->setTimezone('UTC');
+            } catch (\Exception $e2) {
+                // Si todo falla, retornar null
+                return null;
+            }
+        }
+    }
+
+    /**
+     * Mutator para fecha_inicio_vigencia
+     * Guarda la fecha tal como viene sin conversión de zona horaria
+     */
+    public function setFechaInicioVigenciaAttribute($value)
+    {
+        if (!$value) {
+            $this->attributes['fecha_inicio_vigencia'] = null;
+            return;
+        }
+        // Si es string, guardarlo directamente
+        if (is_string($value)) {
+            $this->attributes['fecha_inicio_vigencia'] = $value;
+            return;
+        }
+        // Si es Carbon, formatearlo como string en UTC
+        if ($value instanceof \Carbon\Carbon) {
+            $this->attributes['fecha_inicio_vigencia'] = $value->setTimezone('UTC')->format('Y-m-d H:i:s');
+            return;
+        }
+        $this->attributes['fecha_inicio_vigencia'] = $value;
+    }
+
+    /**
+     * Mutator para fecha_fin_vigencia
+     * Guarda la fecha tal como viene sin conversión de zona horaria
+     */
+    public function setFechaFinVigenciaAttribute($value)
+    {
+        if (!$value) {
+            $this->attributes['fecha_fin_vigencia'] = null;
+            return;
+        }
+        // Si es string, guardarlo directamente
+        if (is_string($value)) {
+            $this->attributes['fecha_fin_vigencia'] = $value;
+            return;
+        }
+        // Si es Carbon, formatearlo como string en UTC
+        if ($value instanceof \Carbon\Carbon) {
+            $this->attributes['fecha_fin_vigencia'] = $value->setTimezone('UTC')->format('Y-m-d H:i:s');
+            return;
+        }
+        $this->attributes['fecha_fin_vigencia'] = $value;
+    }
+
+    // Relaciones
+    public function tipoConcurso()
+    {
+        return $this->belongsTo(TipoConcurso::class, 'idTipoConcurso', 'idTipoConcurso');
+    }
+
+    public function subpruebas()
+    {
+        return $this->hasMany(Subprueba::class, 'idExamen', 'idExamen');
+    }
+
+    public function postulaciones()
+    {
+        return $this->hasMany(Postulacion::class, 'idExamen', 'idExamen');
+    }
+
+    public function usuariosAsignados()
+    {
+        return $this->hasMany(ExamenesUsuario::class, 'idExamen', 'idExamen');
+    }
+
+    public function intentos()
+    {
+        return $this->hasMany(IntentoExamen::class, 'idExamen', 'idExamen');
+    }
+
     public function preguntas()
     {
-        return $this->belongsToMany(Pregunta::class, 'examen_pregunta', 'idExamen', 'idPregunta');
+        return $this->belongsToMany(Pregunta::class, 'examen_pregunta', 'idExamen', 'idPregunta')
+            ->withPivot('orden', 'idSubprueba')
+            ->orderBy('examen_pregunta.orden')
+            ->withTimestamps();
     }
 
     /**
-     * Relacion para exámenes aleatorios, define las categorías y reglas para seleccionar preguntas al azar.
+     * Verifica y actualiza automáticamente los estados de los exámenes basándose en las fechas de vigencia.
+     * Este método se puede llamar desde cualquier parte del sistema y se ejecutará automáticamente.
+     *
+     * @return array ['publicados' => int, 'finalizados' => int]
      */
-    public function categoriasParaAleatorio()
+    public static function actualizarEstadosAutomaticamente(): array
     {
-        return $this->belongsToMany(Categoria::class, 'categoria_examen', 'idExamen', 'idCategoria')
-            ->withPivot('numero_preguntas'); // <-- ¡Importante! Para poder leer la cantidad.
+        // Usar el servicio centralizado para garantizar consistencia
+        $ahoraStr = \App\Services\FechaService::ahoraString();
+        $ahora = \App\Services\FechaService::ahora();
+
+        $publicados = 0;
+        $finalizados = 0;
+
+        try {
+            \Illuminate\Support\Facades\DB::beginTransaction();
+
+            // 1. PUBLICAR EXÁMENES: Cambiar de Borrador (0) a Publicado (1)
+            // IMPORTANTE: Solo publicar si el examen está completo
+            $examenesParaPublicar = self::where('estado', '0')
+                ->whereNotNull('fecha_inicio_vigencia')
+                ->get();
+
+            $completitudService = new \App\Services\ExamenCompletitudService();
+
+            foreach ($examenesParaPublicar as $examen) {
+                $fechaInicioRaw = $examen->getRawOriginal('fecha_inicio_vigencia');
+
+                if ($fechaInicioRaw && strcmp($ahoraStr, $fechaInicioRaw) >= 0) {
+                    // Verificar que el examen esté completo antes de publicar
+                    if ($completitudService->puedePublicar($examen)) {
+                        $examen->estado = '1';
+                        $examen->save();
+                        $publicados++;
+
+                        \Illuminate\Support\Facades\Log::info('Examen publicado automáticamente por fecha_inicio_vigencia', [
+                            'examen_id' => $examen->idExamen,
+                            'codigo_examen' => $examen->codigo_examen,
+                            'fecha_inicio_vigencia' => $fechaInicioRaw,
+                            'hora_actual' => $ahoraStr,
+                        ]);
+                    } else {
+                        \Illuminate\Support\Facades\Log::info('Examen no publicado automáticamente: no está completo', [
+                            'examen_id' => $examen->idExamen,
+                            'codigo_examen' => $examen->codigo_examen,
+                            'fecha_inicio_vigencia' => $fechaInicioRaw,
+                            'hora_actual' => $ahoraStr,
+                        ]);
+                    }
+                }
+            }
+
+            // 2. FINALIZAR EXÁMENES: Cambiar de Publicado (1) a Finalizado (2)
+            $examenesParaFinalizar = self::where('estado', '1')
+                ->whereNotNull('fecha_fin_vigencia')
+                ->with('intentos')
+                ->get();
+
+            foreach ($examenesParaFinalizar as $examen) {
+                $fechaFinRaw = $examen->getRawOriginal('fecha_fin_vigencia');
+
+                if ($fechaFinRaw && strcmp($ahoraStr, $fechaFinRaw) >= 0) {
+                    // Cerrar todos los intentos en progreso
+                    $intentosEnProgreso = $examen->intentos()->where('estado', 'iniciado')->get();
+                    foreach ($intentosEnProgreso as $intento) {
+                        $intento->estado = 'enviado';
+                        $intento->hora_fin = $ahora;
+                        $intento->save();
+                    }
+
+                    $examen->estado = '2';
+                    $examen->save();
+                    $finalizados++;
+
+                    \Illuminate\Support\Facades\Log::info('Examen finalizado automáticamente por fecha_fin_vigencia', [
+                        'examen_id' => $examen->idExamen,
+                        'codigo_examen' => $examen->codigo_examen,
+                        'fecha_fin_vigencia' => $fechaFinRaw,
+                        'hora_actual' => $ahoraStr,
+                        'intentos_cerrados' => $intentosEnProgreso->count(),
+                    ]);
+                }
+            }
+
+            \Illuminate\Support\Facades\DB::commit();
+
+            return [
+                'publicados' => $publicados,
+                'finalizados' => $finalizados
+            ];
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            \Illuminate\Support\Facades\Log::error('Error al actualizar estados de exámenes automáticamente', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return [
+                'publicados' => 0,
+                'finalizados' => 0
+            ];
+        }
     }
 
     /**
-     * Define la relación: Un Examen puede tener muchos Resultados.
+     * Boot del modelo - se ejecuta automáticamente cuando se consulta un examen individual
      */
-    public function resultados()
+    protected static function boot()
     {
-        return $this->hasMany(Resultado::class, 'idExamen', 'idExamen');
-    }
+        parent::boot();
 
-    // Accessors
-    public function getEstadoNameAttribute()
-    {
-        return match ($this->estado) {
-            '0' => 'Borrador',
-            '1' => 'Publicado',
-            '2' => 'Cerrado',
-            default => 'Desconocido'
-        };
-    }
+        // Verificar y actualizar el estado del examen cuando se accede a él
+        static::retrieved(function ($examen) {
+            // Solo verificar si el examen tiene fechas de vigencia y no está en el estado final
+            if (($examen->fecha_inicio_vigencia || $examen->fecha_fin_vigencia) && $examen->estado !== '2') {
+                // Usar el servicio centralizado para garantizar consistencia
+                $ahora = \App\Services\FechaService::ahora();
+                $ahoraStr = \App\Services\FechaService::ahoraString();
 
-    public function getTipoSeleccionNameAttribute()
-    {
-        return $this->tipo_seleccion === '0' ? 'Manual (Fijas)' : 'Aleatorio (Dinámicas)';
-    }
+                $fechaInicioRaw = $examen->getRawOriginal('fecha_inicio_vigencia');
+                $fechaFinRaw = $examen->getRawOriginal('fecha_fin_vigencia');
 
-    // Scopes
-    public function scopePublicados($query)
-    {
-        return $query->where('estado', '1');
-    }
+                $necesitaActualizacion = false;
 
-    public function scopeBorradores($query)
-    {
-        return $query->where('estado', '0');
-    }
+                // Verificar si necesita publicarse
+                // IMPORTANTE: Solo publicar automáticamente si el examen está completo
+                if ($examen->estado === '0' && $fechaInicioRaw && strcmp($ahoraStr, $fechaInicioRaw) >= 0) {
+                    // Verificar que el examen esté completo antes de publicar
+                    $completitudService = new \App\Services\ExamenCompletitudService();
+                    if ($completitudService->puedePublicar($examen)) {
+                        $examen->estado = '1';
+                        $necesitaActualizacion = true;
+                    }
+                }
 
-    public function scopeCerrados($query)
-    {
-        return $query->where('estado', '2');
-    }
+                // Verificar si necesita finalizarse
+                if ($examen->estado === '1' && $fechaFinRaw && strcmp($ahoraStr, $fechaFinRaw) >= 0) {
+                    $intentosEnProgreso = $examen->intentos()->where('estado', 'iniciado')->get();
+                    foreach ($intentosEnProgreso as $intento) {
+                        $intento->estado = 'enviado';
+                        $intento->hora_fin = $ahora;
+                        $intento->save();
+                    }
+                    $examen->estado = '2';
+                    $necesitaActualizacion = true;
+                }
 
-    public function scopeActivos($query)
-    {
-        return $query->where('estado', '1')
-            ->where('fechaInicio', '<=', now())
-            ->where('fechaFin', '>=', now());
-    }
-
-    public function scopeAleatorios($query)
-    {
-        return $query->where('tipo_seleccion', '1');
-    }
-
-    public function scopeManuales($query)
-    {
-        return $query->where('tipo_seleccion', '0');
-    }
-
-    // Métodos auxiliares
-    public function isPublicado()
-    {
-        return $this->estado === '1';
-    }
-
-    public function isAleatorio()
-    {
-        return $this->tipo_seleccion === '1';
-    }
-
-    public function isManual()
-    {
-        return $this->tipo_seleccion === '0';
-    }
-
-    public function estaActivo()
-    {
-        return $this->estado === '1'
-            && $this->fechaInicio <= now()
-            && $this->fechaFin >= now();
-    }
-
-    public function yaInicio()
-    {
-        return $this->fechaInicio <= now();
-    }
-
-    public function yaFinalizo()
-    {
-        return $this->fechaFin < now();
+                if ($necesitaActualizacion) {
+                    $examen->save();
+                }
+            }
+        });
     }
 }

@@ -9,42 +9,45 @@ use Illuminate\Http\Request;
 class CategoriaController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * RF-A.3.1: CRUD de Categorías
      */
     public function index()
     {
-        //
+        $categorias = Categoria::orderBy('nombre')->get();
+        return response()->json($categorias);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        //
+        $request->validate([
+            'nombre' => 'required|string|max:255|unique:categorias,nombre',
+            'descripcion' => 'nullable|string',
+        ]);
+
+        $categoria = Categoria::create($request->only(['nombre', 'descripcion']));
+        return response()->json($categoria, 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Categoria $categoria)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, Categoria $categoria)
     {
-        //
+        $request->validate([
+            'nombre' => 'required|string|max:255|unique:categorias,nombre,' . $categoria->idCategoria . ',idCategoria',
+            'descripcion' => 'nullable|string',
+        ]);
+
+        $categoria->update($request->only(['nombre', 'descripcion']));
+        return response()->json($categoria);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Categoria $categoria)
     {
-        //
+        if ($categoria->preguntas()->exists() || $categoria->contextos()->exists()) {
+            return response()->json([
+                'message' => 'No se puede eliminar la categoría porque tiene preguntas o contextos asociados.'
+            ], 422);
+        }
+
+        $categoria->delete();
+        return response()->json(null, 204);
     }
 }

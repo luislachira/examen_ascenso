@@ -1,69 +1,127 @@
-// Components
-import PasswordResetLinkController from '@/actions/App/Http/Controllers/Auth/PasswordResetLinkController';
-import { login } from '@/routes';
-import { Form, Head } from '@inertiajs/react';
-import { LoaderCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import '@css/Login.css';
+import logo from '@/assets/logo_leonor_cerna 2.png';
 
-import InputError from '@/components/input-error';
-import TextLink from '@/components/text-link';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import AuthLayout from '@/layouts/auth-layout';
+interface ApiError {
+    response?: {
+        data?: {
+            message?: string;
+            errors?: {
+                email?: string[];
+            };
+        };
+    };
+}
 
-export default function ForgotPassword({ status }: { status?: string }) {
-    return (
-        <AuthLayout
-            title="Forgot password"
-            description="Enter your email to receive a password reset link"
-        >
-            <Head title="Forgot password" />
+const ForgotPassword: React.FC = () => {
+    const [email, setEmail] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState(false);
 
-            {status && (
-                <div className="mb-4 text-center text-sm font-medium text-green-600">
-                    {status}
-                </div>
-            )}
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
+        setMessage(null);
+        setLoading(true);
 
-            <div className="space-y-6">
-                <Form {...PasswordResetLinkController.store.form()}>
-                    {({ processing, errors }) => (
-                        <>
-                            <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    name="email"
-                                    autoComplete="off"
-                                    autoFocus
-                                    placeholder="email@example.com"
-                                />
+        try {
+            const response = await fetch('/api/v1/auth/forgot-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ correo: email })
+            });
 
-                                <InputError message={errors.email} />
-                            </div>
+            const data = await response.json();
 
-                            <div className="my-6 flex items-center justify-start">
-                                <Button
-                                    className="w-full"
-                                    disabled={processing}
-                                    data-test="email-password-reset-link-button"
-                                >
-                                    {processing && (
-                                        <LoaderCircle className="h-4 w-4 animate-spin" />
-                                    )}
-                                    Email password reset link
-                                </Button>
-                            </div>
-                        </>
-                    )}
-                </Form>
+            if (response.ok) {
+                setSuccess(true);
+                setMessage(data.message || 'Se ha enviado un enlace de recuperación a tu correo electrónico.');
+            } else {
+                throw { response: { data } };
+            }
+        } catch (err: unknown) {
+            const apiError = err as ApiError;
+            const errorMessage = apiError?.response?.data?.message || 
+                               apiError?.response?.data?.errors?.email?.[0] || 
+                               'Error al enviar el enlace de recuperación';
+            setError(errorMessage);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-                <div className="space-x-1 text-center text-sm text-muted-foreground">
-                    <span>Or, return to</span>
-                    <TextLink href={login()}>log in</TextLink>
+    if (success) {
+        return (
+            <div className="login-container">
+                <div className="login-box">
+                    <div className="login-header">
+                        <img src={logo} alt="Logo I.E. Leonor Cerna de Valdiviezo" />
+                        <h2>I.E. LEONOR CERNA DE VALDIVIEZO</h2>
+                    </div>
+                    <div className="success-message-container">
+                        <div className="success-icon">✉️</div>
+                        <h3>Correo Enviado</h3>
+                        {message && <p className="success-message">{message}</p>}
+                        <Link to="/login" className="btn btn-primary">
+                            Volver al Login
+                        </Link>
+                    </div>
                 </div>
             </div>
-        </AuthLayout>
+        );
+    }
+
+    return (
+        <div className="login-container">
+            <div className="login-box">
+                <div className="login-header">
+                    <img src={logo} alt="Logo I.E. Leonor Cerna de Valdiviezo" />
+                    <h2>I.E. LEONOR CERNA DE VALDIVIEZO</h2>
+                </div>
+                <div className="forgot-password-content">
+                    <h3>Recuperar Contraseña</h3>
+                    <p>Ingresa tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.</p>
+                    
+                    <form className="login-form" onSubmit={handleSubmit}>
+                        <div className="input-group">
+                            <label htmlFor="email">Correo Electrónico</label>
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                placeholder="tu.correo@ejemplo.com"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                required
+                                autoFocus
+                            />
+                        </div>
+
+                        {error && <div className="error-message">{error}</div>}
+                        {message && <div className="success-message">{message}</div>}
+
+                        <button 
+                            type="submit" 
+                            className="btn btn-primary" 
+                            disabled={loading}
+                        >
+                            {loading ? 'Enviando...' : 'Enviar Enlace de Recuperación'}
+                        </button>
+                        
+                        <Link to="/login" className="btn btn-secondary">
+                            Volver al Login
+                        </Link>
+                    </form>
+                </div>
+            </div>
+        </div>
     );
-}
+};
+
+export default ForgotPassword;

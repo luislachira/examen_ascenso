@@ -1,0 +1,159 @@
+═══════════════════════════════════════════════════════════════
+  CONFIGURACIÓN DE OAUTH CON examen-ascenso.com (LOCAL)
+═══════════════════════════════════════════════════════════════
+
+PROBLEMA ACTUAL:
+----------------
+Cuando intentas registrarte con Google OAuth, te redirige al login
+sin registrarte porque la configuración no coincide.
+
+SOLUCIÓN EN 4 PASOS:
+--------------------
+
+┌─────────────────────────────────────────────────────────────┐
+│ PASO 1: Reiniciar Apache                                   │
+└─────────────────────────────────────────────────────────────┘
+
+Acabamos de actualizar el archivo de virtual hosts. Necesitas
+reiniciar Apache desde el panel de control de WAMP:
+
+1. Clic en el ícono de WAMP en la bandeja del sistema
+2. Apache > Service > Restart All Services
+
+
+┌─────────────────────────────────────────────────────────────┐
+│ PASO 2: Configurar Google Cloud Console                    │
+└─────────────────────────────────────────────────────────────┘
+
+1. Ve a: https://console.cloud.google.com/apis/credentials
+
+2. Selecciona tu proyecto
+
+3. Haz clic en tu OAuth 2.0 Client ID
+
+4. En "URIs de redireccionamiento autorizadas", AGREGA:
+
+   https://examen-ascenso.com/api/v1/oauth/callback/google
+   
+   ⚠️  IMPORTANTE: Debe ser HTTPS, no HTTP
+
+5. En "Orígenes de JavaScript autorizados", AGREGA:
+
+   https://examen-ascenso.com
+   
+6. Haz clic en "GUARDAR"
+
+
+┌─────────────────────────────────────────────────────────────┐
+│ PASO 3: Limpiar caché de Laravel                          │
+└─────────────────────────────────────────────────────────────┘
+
+Ejecuta estos comandos en PowerShell:
+
+php artisan config:clear
+php artisan cache:clear
+php artisan route:clear
+
+
+┌─────────────────────────────────────────────────────────────┐
+│ PASO 4: Acceder al sitio via HTTPS                        │
+└─────────────────────────────────────────────────────────────┘
+
+IMPORTANTE: Debes acceder al sitio usando:
+
+   ✅ https://examen-ascenso.com
+   
+   ❌ NO uses http://examen-ascenso.com
+
+El navegador te mostrará una advertencia de seguridad porque
+estás usando un certificado autofirmado. Esto es NORMAL:
+
+1. En Chrome: Haz clic en "Avanzado" > "Continuar a examen-ascenso.com"
+2. En Firefox: "Avanzado" > "Aceptar el riesgo y continuar"
+3. En Edge: "Avanzado" > "Continuar a examen-ascenso.com (no seguro)"
+
+
+═══════════════════════════════════════════════════════════════
+  VERIFICACIÓN
+═══════════════════════════════════════════════════════════════
+
+Después de completar los 4 pasos:
+
+1. Abre: https://examen-ascenso.com
+2. Haz clic en "Sign in with Google"
+3. Deberías ver la pantalla de consentimiento de Google
+4. Acepta las condiciones
+5. Deberías ver el mensaje de "Registro Exitoso" 
+   con el ícono de reloj ⏳
+
+
+═══════════════════════════════════════════════════════════════
+  SOLUCIÓN DE PROBLEMAS
+═══════════════════════════════════════════════════════════════
+
+❌ Error: "redirect_uri_mismatch"
+   → Verifica que en Google Console esté EXACTAMENTE:
+     https://examen-ascenso.com/api/v1/oauth/callback/google
+
+❌ Sigue redirigiendo al login sin registrar
+   → Revisa el archivo: storage/logs/laravel.log
+   → Ejecuta: php diagnose_oauth.php
+   → Verifica que estés accediendo via HTTPS
+
+❌ El navegador dice "No se puede establecer conexión segura"
+   → Verifica que Apache esté escuchando en el puerto 443
+   → Revisa que el virtual host HTTPS esté configurado
+   → Reinicia Apache completamente
+
+❌ "This site can't be reached"
+   → Verifica el archivo hosts:
+     C:\Windows\System32\drivers\etc\hosts
+   → Debe contener: 127.0.0.1 examen-ascenso.com
+
+
+═══════════════════════════════════════════════════════════════
+  COMANDO ÚTIL PARA VER LOGS EN TIEMPO REAL
+═══════════════════════════════════════════════════════════════
+
+Abre una terminal PowerShell y ejecuta:
+
+Get-Content "C:\wamp64\www\laravel\examen_ascenso\storage\logs\laravel.log" -Wait -Tail 50
+
+Esto te mostrará los logs en tiempo real mientras pruebas OAuth.
+
+
+═══════════════════════════════════════════════════════════════
+  RESUMEN DE CONFIGURACIÓN
+═══════════════════════════════════════════════════════════════
+
+✅ Archivo .env:
+   APP_URL=https://examen-ascenso.com
+   FRONTEND_URL=https://examen-ascenso.com
+
+✅ Google Console:
+   Callback URI: https://examen-ascenso.com/api/v1/oauth/callback/google
+   Origen JS: https://examen-ascenso.com
+
+✅ Virtual Host (httpd-vhosts.conf):
+   Puerto 80: Redirige a HTTPS
+   Puerto 443: Configurado con SSL
+
+✅ Archivo hosts:
+   127.0.0.1 examen-ascenso.com
+
+✅ Acceso:
+   https://examen-ascenso.com (con HTTPS)
+
+
+═══════════════════════════════════════════════════════════════
+  ¿NECESITAS AYUDA?
+═══════════════════════════════════════════════════════════════
+
+Si después de seguir estos pasos sigues teniendo problemas:
+
+1. Ejecuta: php diagnose_oauth.php
+2. Revisa el log: storage/logs/laravel.log
+3. Toma una captura de pantalla del error
+4. Comparte los resultados para ayudarte mejor
+
+═══════════════════════════════════════════════════════════════

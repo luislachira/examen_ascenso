@@ -23,6 +23,7 @@ class ProfileController extends Controller
 
         $validated = $request->validated();
 
+        // Restricción de 30 días para actualizar perfil (excepto administradores)
         if (!$user->esAdmin()) {
             $lastUpdate = Carbon::parse($user->updated_at);
             if ($lastUpdate->diffInDays(now()) < 30) {

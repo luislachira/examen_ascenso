@@ -15,9 +15,10 @@ class ForgotPasswordController extends Controller
      */
     public function forgotPassword(ForgotPasswordRequest $request)
     {
-        $response = Password::broker()->sendResetLink(
-            $request->only('correo')
-        );
+        // Mapear correo a email para el sistema de Laravel Password Reset
+        $credentials = ['email' => $request->input('correo')];
+        
+        $response = Password::broker()->sendResetLink($credentials);
 
         if ($response == Password::RESET_LINK_SENT) {
             return response()->json(['message' => 'Se ha enviado el enlace para restablecer la contraseña a su correo.'], 200);
@@ -31,8 +32,15 @@ class ForgotPasswordController extends Controller
      */
     public function resetPassword(ResetPasswordRequest $request)
     {
+        $credentials = [
+            'email' => $request->input('correo'),
+            'password' => $request->input('password'),
+            'password_confirmation' => $request->input('password_confirmation'),
+            'token' => $request->input('token')
+        ];
+        
         $response = Password::broker()->reset(
-            $request->only('correo', 'password', 'password_confirmation', 'token'),
+            $credentials,
             function ($user, $password) {
                 $user->password = Hash::make($password);
                 $user->save();

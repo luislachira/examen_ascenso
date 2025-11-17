@@ -6,19 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\Usuario;
+
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
-use Laravel\Socialite\Facades\Socialite;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
     public function register(RegisterRequest $request)
     {
 
-        $usuario = Usuario::create(array_merge(
+        Usuario::create(array_merge(
             $request->validated(),
             [
                 'rol' => Usuario::ROL_DOCENTE, // Por defecto se registran como docentes
@@ -48,30 +47,49 @@ class AuthController extends Controller
             return response()->json(['message' => "Su cuenta está {$status}."], 403);
         }
 
-        // --- LÓGICA DE PASSPORT ---
-        // Hacemos una petición interna a la ruta /oauth/token de Passport
-        $response = Http::asForm()->post(url('/oauth/token'), [
-            'grant_type' => 'password',
-            'client_id' => '2', // <-- El ID de tu "Password Grant Client"
-            'client_secret' => 'tu_client_secret', // <-- El Secret de tu "Password Grant Client"
-            'username' => $request->correo,
-            'password' => $request->password,
-            'scope' => '',
+        // Crear token de Passport para el usuario
+        $tokenResult = $usuario->createToken('API Token');
+        $token = $tokenResult->accessToken;
+
+        // Actualizar la última actividad del token al momento de creación
+        \Illuminate\Support\Facades\DB::table('oauth_access_tokens')
+            ->where('id', $tokenResult->token->id)
+            ->update(['updated_at' => \Carbon\Carbon::now()]);
+
+        // Devolver el token junto con la información del usuario
+        return response()->json([
+            'access_token' => $token,
+            'token_type' => 'Bearer',
+            'usuario' => [
+                'idUsuario' => $usuario->idUsuario,
+                'nombre' => $usuario->nombre,
+                'apellidos' => $usuario->apellidos,
+                'correo' => $usuario->correo,
+                'rol' => $usuario->rol,
+            ]
         ]);
-
-        // Si la petición a Passport falla, devolvemos el error
-        if ($response->failed()) {
-            return response()->json(['message' => 'Error de autenticación.'], 401);
-        }
-
-        // Si todo es correcto, devolvemos la respuesta de Passport (que incluye el token)
-        return response()->json($response->json());
     }
 
     public function logout(Request $request)
     {
-        // Revoca el token de acceso que se usó para autenticar la llamada actual
-        $request->user()->token()->revoke();
-        return response()->json(['message' => 'Sesión cerrada exitosamente']);
+        try {
+        // Revocar el token actual
+        $token = $request->user()->token();
+
+        if ($token) {
+            $token->revoke();
+        }
+
+        return response()->json([
+            'message' => 'Sesión cerrada exitosamente'
+        ], 200);
+
+    } catch (\Exception $e) {
+        //Log::error('Error en logout: ' . $e->getMessage());
+
+        return response()->json([
+            'message' => 'Error al cerrar sesión'
+        ], 500);
+    }
     }
 }

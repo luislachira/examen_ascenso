@@ -1,10 +1,53 @@
 .main-layout {
     display: flex;
-    background-color: #f4f7fa; /* Gris claro para el área de contenido */
     min-height: 100vh;
+    position: relative;
+    gap: 0;
 }
 
 .content-area {
     flex-grow: 1;
-    padding: 2rem;
+    padding: 0;
+    margin-left: 0;
+}
+
+/* Desktop: sidebar fijo */
+@media (min-width: 769px) {
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        z-index: 100;
+        margin: 0;
+        padding: 0;
+    }
+
+    .content-area {
+        margin-left: 240px; /* Exactamente el ancho del sidebar */
+        padding-left: 2rem;
+        padding-right: 2rem;
+        padding-top: 1.5rem;
+        padding-bottom: 1.5rem;
+    }
+}
+
+/* Mobile: sidebar responsive */
+@media (max-width: 768px) {
+    .main-layout {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        border-radius: 0;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .content-area {
+        padding: 1rem;
+        margin-left: 0;
+    }
 }

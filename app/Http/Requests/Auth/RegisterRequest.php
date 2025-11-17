@@ -14,7 +14,6 @@ class RegisterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'dni' => 'required|digits:8|unique:usuarios,dni',
             'nombre' => 'required|string|max:200',
             'apellidos' => 'required|string|max:250',
             'correo' => 'required|string|email|max:250|unique:usuarios,correo',
@@ -25,9 +24,6 @@ class RegisterRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'dni.required' => 'El DNI es obligatorio.',
-            'dni.digits' => 'El DNI debe tener exactamente 8 dígitos.',
-            'dni.unique' => 'Este DNI ya está registrado.',
             'nombre.required' => 'El nombre es obligatorio.',
             'nombre.max' => 'El nombre no puede exceder 200 caracteres.',
             'apellidos.required' => 'Los apellidos son obligatorios.',

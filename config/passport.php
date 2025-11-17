@@ -43,19 +43,4 @@ return [
 
     'connection' => env('PASSPORT_CONNECTION'),
 
-    /*
-    |--------------------------------------------------------------------------
-    | Password Grant Client
-    |--------------------------------------------------------------------------
-    |
-    | Passport automatically creates a password grant client for you when
-    | running the `passport:install` command. Here you may configure
-    | the client ID and secret used by this client to obtain tokens.
-    |
-    */
-    'password_grant_client' => [
-        'id' => env('PASSPORT_PASSWORD_GRANT_CLIENT_ID'),
-        'secret' => env('PASSPORT_PASSWORD_GRANT_CLIENT_SECRET'),
-    ],
-
 ];

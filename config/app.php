@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Laravel'),
+    'name' => env('APP_NAME', 'Examen de Ascenso'),
 
     /*
     |--------------------------------------------------------------------------
@@ -65,7 +65,7 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => 'America/Lima',
 
     /*
     |--------------------------------------------------------------------------
@@ -96,6 +96,18 @@ return [
     */
 
     'cipher' => 'AES-256-CBC',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Límite de preguntas
+    |--------------------------------------------------------------------------
+    |
+    | Este valor define el límite máximo de preguntas que se pueden crear
+    | en el banco de preguntas.
+    |
+    */
+
+    'limite_preguntas' => env('LIMITE_PREGUNTAS', 1000),
 
     'key' => env('APP_KEY'),
 
