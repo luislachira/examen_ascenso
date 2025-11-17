@@ -567,7 +567,7 @@ export const useTomaExamen = (): UseTomaExamenResult => {
       }
 
       return true;
-    } catch (err: unknown) {
+    } catch {
       // Error de conexión: guardar en pendientes para sincronizar después
       setRespuestasPendientes(prev => ({
         ...prev,

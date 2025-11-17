@@ -57,7 +57,7 @@ const Paso4ReglasPuntaje: React.FC<Props> = ({
         }
       }
       setReglas(todasReglas);
-    } catch (err: unknown) {
+    } catch {
       setError('Error al cargar los datos');
     }
   }, [examenId]);

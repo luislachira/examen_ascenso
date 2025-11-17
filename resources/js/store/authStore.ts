@@ -143,9 +143,6 @@ export const apiLogin = async (credentials: LoginCredentials) => {
         await new Promise(resolve => setTimeout(resolve, 100));
 
         return { access_token, usuario };
-    } catch (error) {
-        throw error;
-    }
 };
 
 export const apiRegister = async (data: RegisterData) => {
