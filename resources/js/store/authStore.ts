@@ -122,27 +122,26 @@ export const authStore = {
 
 // --- Funciones de API ---
 export const apiLogin = async (credentials: LoginCredentials) => {
-    try {
-        const response = await clienteApi.post('/login', credentials);
-        const { access_token, usuario } = response.data;
+    const response = await clienteApi.post('/login', credentials);
+    const { access_token, usuario } = response.data;
 
-        // Actualizar estado
-        state = {
-            token: access_token,
-            user: usuario,
-            isInitialized: true
-        };
+    // Actualizar estado
+    state = {
+        token: access_token,
+        user: usuario,
+        isInitialized: true
+    };
 
-        // Persistir inmediatamente
-        persistState();
+    // Persistir inmediatamente
+    persistState();
 
-        // Emitir cambios
-        emitChange();
+    // Emitir cambios
+    emitChange();
 
-        // Pequeño delay para asegurar que el estado se propague
-        await new Promise(resolve => setTimeout(resolve, 100));
+    // Pequeño delay para asegurar que el estado se propague
+    await new Promise(resolve => setTimeout(resolve, 100));
 
-        return { access_token, usuario };
+    return { access_token, usuario };
 };
 
 export const apiRegister = async (data: RegisterData) => {
