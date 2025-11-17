@@ -12,18 +12,30 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Eliminar foreign key si existe
-        $foreignKeys = DB::select("
-            SELECT CONSTRAINT_NAME
-            FROM information_schema.KEY_COLUMN_USAGE
-            WHERE TABLE_SCHEMA = DATABASE()
-            AND TABLE_NAME = 'intento_examenes'
-            AND COLUMN_NAME = 'idSubpruebaSeleccionada'
-            AND REFERENCED_TABLE_NAME IS NOT NULL
-        ");
+        // Eliminar foreign key si existe (solo en MySQL/MariaDB)
+        if (DB::getDriverName() !== 'sqlite') {
+            $foreignKeys = DB::select("
+                SELECT CONSTRAINT_NAME
+                FROM information_schema.KEY_COLUMN_USAGE
+                WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'intento_examenes'
+                AND COLUMN_NAME = 'idSubpruebaSeleccionada'
+                AND REFERENCED_TABLE_NAME IS NOT NULL
+            ");
 
-        foreach ($foreignKeys as $fk) {
-            DB::statement("ALTER TABLE intento_examenes DROP FOREIGN KEY {$fk->CONSTRAINT_NAME}");
+            foreach ($foreignKeys as $fk) {
+                DB::statement("ALTER TABLE intento_examenes DROP FOREIGN KEY {$fk->CONSTRAINT_NAME}");
+            }
+        } else {
+            // En SQLite, intentar eliminar la foreign key usando el Schema Builder
+            // SQLite no soporta DROP FOREIGN KEY directamente, pero Laravel lo maneja
+            try {
+                Schema::table('intento_examenes', function (Blueprint $table) {
+                    $table->dropForeign(['idSubpruebaSeleccionada']);
+                });
+            } catch (\Exception $e) {
+                // La foreign key puede no existir, continuar
+            }
         }
 
         // Eliminar columna si existe

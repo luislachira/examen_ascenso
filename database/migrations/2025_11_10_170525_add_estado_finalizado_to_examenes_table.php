@@ -14,7 +14,12 @@ return new class extends Migration
     public function up(): void
     {
         // Modificar el ENUM para incluir el estado '2' = 'Finalizado'
-        DB::statement("ALTER TABLE examenes MODIFY COLUMN estado ENUM('0', '1', '2') COMMENT '0=Borrador, 1=Publicado, 2=Finalizado'");
+        // Solo ejecutar en MySQL/MariaDB, no en SQLite (usado en tests)
+        // SQLite no soporta ENUMs de la misma manera, pero Laravel los maneja a nivel de aplicación
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE examenes MODIFY COLUMN estado ENUM('0', '1', '2') COMMENT '0=Borrador, 1=Publicado, 2=Finalizado'");
+        }
+        // En SQLite, el ENUM se maneja a nivel de aplicación, no a nivel de base de datos
     }
 
     /**
@@ -31,6 +36,9 @@ return new class extends Migration
         }
 
         // Revertir el ENUM a su estado original
-        DB::statement("ALTER TABLE examenes MODIFY COLUMN estado ENUM('0', '1') COMMENT '0=Borrador, 1=Publicado'");
+        // Solo ejecutar en MySQL/MariaDB, no en SQLite (usado en tests)
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE examenes MODIFY COLUMN estado ENUM('0', '1') COMMENT '0=Borrador, 1=Publicado'");
+        }
     }
 };

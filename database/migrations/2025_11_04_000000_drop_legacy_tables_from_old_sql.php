@@ -8,7 +8,11 @@ return new class extends Migration {
     public function up(): void
     {
         // Eliminar tablas legadas del SQL antiguo si existen
-        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        // Solo desactivar foreign key checks en MySQL/MariaDB, no en SQLite (usado en tests)
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        }
+
         $legacyTables = [
             'categoria_examen',
             'categorias',
@@ -27,7 +31,11 @@ return new class extends Migration {
                 Schema::drop($table);
             }
         }
-        DB::statement('SET FOREIGN_KEY_CHECKS=1');
+
+        // Solo reactivar foreign key checks en MySQL/MariaDB
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        }
     }
 
     public function down(): void
