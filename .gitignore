@@ -80,8 +80,9 @@ catch_*.txt
 /public/check_*.php
 /public/test-*.html
 /public/test-*.php
-# Ignorar todos los archivos .txt
+# Ignorar todos los archivos .txt excepto robots.txt
 *.txt
+!public/robots.txt
 
 # Ignorar todos los archivos .md excepto README.md
 *.md
