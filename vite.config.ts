@@ -1,30 +1,145 @@
+import { defineConfig, loadEnv, UserConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
-import { defineConfig } from 'vite';
+import path from 'path';
+import fs from 'fs'; // Importamos el módulo 'fs' de Node.js
 
-export default defineConfig({
-    plugins: [
-        laravel({
-            // Ajusta la ruta de entrada para el CSS si es necesario
-            input: ['resources/css/app.css', 'resources/js/app.tsx'],
-            ssr: 'resources/js/ssr.tsx',
-            refresh: true,
-        }),
-        react(),
-        tailwindcss(),
-    ],
-    resolve: {
-        extensions: ['.js', '.jsx', '.ts', '.tsx'],
-        alias: {
-            // El alias '@' apuntará a la carpeta 'resources/js'
-            '@': '/resources/js',
-            // El alias '@res' apuntará a la carpeta raíz 'resources'
-            '@res': '/resources',
-            '@css': '/resources/css',
+// La configuración ahora es una función de TypeScript que devuelve un objeto UserConfig
+export default defineConfig(({ command, mode }): UserConfig => {
+    const env = loadEnv(mode, process.cwd(), '');
+    const serverConfig: UserConfig['server'] = {};
+
+    if (command === 'serve') {
+        const host = 'localhost';
+        serverConfig.host = host;
+
+        // --- ¡LA CLAVE ESTÁ AQUÍ! ---
+        // Esta sección configura el servidor de Hot Module Replacement (HMR)
+        // que es el que sirve los archivos en desarrollo.
+        serverConfig.hmr = {
+            host,
+        };
+        // Configurar CORS en el servidor
+        serverConfig.cors = true;
+
+        try {
+            serverConfig.https = {
+                key: fs.readFileSync(path.resolve(__dirname, `certs/localhost-key.pem`)),
+                cert: fs.readFileSync(path.resolve(__dirname, `certs/localhost.pem`)),
+            };
+        } catch {
+            console.warn('Advertencia: No se pudieron cargar los certificados SSL. Vite se ejecutará en modo HTTP.');
+        }
+
+        serverConfig.proxy = {
+            '/api': {
+                target: env.VITE_APP_URL || 'http://localhost:8000',
+                changeOrigin: true,
+                secure: false,
+            },
+        };
+    }
+
+    return {
+        plugins: [
+            laravel({
+                // Ajusta la ruta de entrada para el CSS si es necesario
+                input: ['resources/css/app.css', 'resources/js/app.tsx'],
+                // SSR deshabilitado - el proyecto usa React Router, no Inertia
+                // ssr: 'resources/js/ssr.tsx',
+                refresh: true,
+            }),
+            react(),
+            tailwindcss(),
+        ],
+
+        // Configuración de build para optimización
+        build: {
+            sourcemap: false, // Sin sourcemaps en dev
+            rollupOptions: {
+                output: {
+                    manualChunks: (id) => {
+                        // Separar node_modules en chunks por librería
+                        if (id.includes('node_modules')) {
+                            // ESTRATEGIA CONSERVADORA: Agrupar React y TODAS sus posibles dependencias
+                            // Si hay alguna duda, mejor incluirla en vendor-react para evitar errores
+
+                            // Primero, identificar librerías que DEFINITIVAMENTE no dependen de React
+                            const nonReactLibs = [
+                                'tailwindcss',
+                                'clsx',
+                                'class-variance-authority',
+                                'tailwind-merge',
+                                'axios',
+                                'guzzle',
+                                'date-fns',
+                                'moment',
+                                'dayjs'
+                            ];
+
+                            // Si es una librería que definitivamente NO depende de React
+                            const isNonReactLib = nonReactLibs.some(lib => id.includes(lib));
+
+                            if (isNonReactLib) {
+                                // Separar por tipo
+                                if (id.includes('tailwindcss') || id.includes('clsx') || id.includes('class-variance-authority') || id.includes('tailwind-merge')) {
+                                    return 'vendor-ui';
+                                }
+                                if (id.includes('axios') || id.includes('guzzle')) {
+                                    return 'vendor-http';
+                                }
+                                if (id.includes('date-fns') || id.includes('moment') || id.includes('dayjs')) {
+                                    return 'vendor-date';
+                                }
+                            }
+
+                            // TODO LO DEMÁS va a vendor-react (incluyendo React y todas sus dependencias)
+                            // Esto asegura que React esté disponible para todas las librerías que lo necesiten
+                            return 'vendor-react';
+                        }
+
+                        // Separar código de la aplicación por secciones
+                        if (id.includes('resources/js/pages/admin')) {
+                            return 'admin';
+                        }
+                        if (id.includes('resources/js/pages/docente')) {
+                            return 'docente';
+                        }
+                        if (id.includes('resources/js/pages/auth')) {
+                            return 'auth';
+                        }
+                        if (id.includes('resources/js/pages/banco-preguntas')) {
+                            return 'banco-preguntas';
+                        }
+                        if (id.includes('resources/js/pages/profile')) {
+                            return 'profile';
+                        }
+                        // Componentes compartidos
+                        if (id.includes('resources/js/components')) {
+                            return 'components';
+                        }
+                        // Hooks y servicios
+                        if (id.includes('resources/js/hooks') || id.includes('resources/js/services')) {
+                            return 'utils';
+                        }
+                    },
+                },
+            },
+            // Límite de advertencia de tamaño (en KB)
+            chunkSizeWarningLimit: 500,
         },
-    },
-    esbuild: {
-        jsx: 'automatic',
-    },
+
+        resolve: {
+            extensions: ['.js', '.jsx', '.ts', '.tsx'],
+            alias: {
+                '@': path.resolve(__dirname, './resources/js'),
+                '~': path.resolve(__dirname, './resources'),
+                '@css': path.resolve(__dirname, './resources/css'),
+                '@img' : path.resolve(__dirname, './resources/js/assets'),
+            },
+        },
+        // --- CONFIGURACIÓN DEL SERVIDOR DE DESARROLLO ---
+        server: serverConfig, // Aplicamos la configuración del servidor
+    };
 });
