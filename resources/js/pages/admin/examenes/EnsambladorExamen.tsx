@@ -160,7 +160,8 @@ const EnsambladorExamen: React.FC<Props> = ({ examenId, soloLectura = false, onC
           setExamenEstado(data.examen.estado);
         }
       }
-    } catch (e: unknown) {
+    } catch {
+      // Ignorar errores al cargar datos
     } finally {
       setLoading(false);
     }
@@ -261,7 +262,8 @@ const EnsambladorExamen: React.FC<Props> = ({ examenId, soloLectura = false, onC
           [idSubprueba]: preguntasDeEstaSubprueba
         });
       }
-    } catch (err: unknown) {
+    } catch {
+      // Ignorar errores al parsear datos de drag and drop
     }
   };
 
@@ -430,7 +432,7 @@ const EnsambladorExamen: React.FC<Props> = ({ examenId, soloLectura = false, onC
           alert(`❌ ${mensaje}`);
         }
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     } finally {
       setGenerandoAleatorio(false);
@@ -474,7 +476,7 @@ const EnsambladorExamen: React.FC<Props> = ({ examenId, soloLectura = false, onC
         const mensaje = errorData.message || errorData.errors ? JSON.stringify(errorData.errors || errorData) : 'Error al guardar las preguntas';
         alert(mensaje);
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     } finally {
       setGuardando(false);

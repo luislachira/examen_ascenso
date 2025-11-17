@@ -112,7 +112,7 @@ const GestionTipoConcurso: React.FC<Props> = ({ onCerrar, onTipoConcursoActualiz
         if (data.errors) setErrors(data.errors);
         else alert(data.message || 'Error al crear el tipo de concurso');
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     } finally {
       setLoading(false);
@@ -157,7 +157,7 @@ const GestionTipoConcurso: React.FC<Props> = ({ onCerrar, onTipoConcursoActualiz
         if (data.errors) setErrors(data.errors);
         else alert(data.message || 'Error al actualizar el tipo de concurso');
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     } finally {
       setLoading(false);
@@ -181,7 +181,7 @@ const GestionTipoConcurso: React.FC<Props> = ({ onCerrar, onTipoConcursoActualiz
         const data = await res.json();
         alert(data.message || 'Error al eliminar el tipo de concurso');
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     } finally {
       setLoading(false);

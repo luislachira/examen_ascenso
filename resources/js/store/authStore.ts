@@ -87,12 +87,12 @@ export async function initializeAuth() {
                 isInitialized: true,
             };
             persistState();
-        } catch (error: unknown) {
+        } catch {
             // Token inválido: limpiar todo
             localStorage.removeItem(STORAGE_KEY);
             state = { user: null, token: null, isInitialized: true };
         }
-    } catch (error: unknown) {
+    } catch {
         state = { user: null, token: null, isInitialized: true };
     }
 
@@ -143,7 +143,7 @@ export const apiLogin = async (credentials: LoginCredentials) => {
         await new Promise(resolve => setTimeout(resolve, 100));
 
         return { access_token, usuario };
-    } catch (error: unknown) {
+    } catch (error) {
         throw error;
     }
 };
@@ -161,7 +161,7 @@ export const apiLogout = async () => {
             await clienteApi.post('/logout', {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-        } catch (error: unknown) {
+        } catch {
             // Continuar con el logout local aunque falle el backend
         }
     }

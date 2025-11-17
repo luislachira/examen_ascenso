@@ -115,7 +115,7 @@ const GestionCategorias: React.FC<Props> = ({ onCerrar, onCategoriaActualizada }
         if (data.errors) setErrors(data.errors);
         else alert(data.message || 'Error al crear la categoría');
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     } finally {
       setLoading(false);
@@ -161,7 +161,7 @@ const GestionCategorias: React.FC<Props> = ({ onCerrar, onCategoriaActualizada }
         if (data.errors) setErrors(data.errors);
         else alert(data.message || 'Error al actualizar la categoría');
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     } finally {
       setLoading(false);
@@ -185,7 +185,7 @@ const GestionCategorias: React.FC<Props> = ({ onCerrar, onCategoriaActualizada }
         const data = await res.json();
         alert(data.message || 'Error al eliminar la categoría');
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     } finally {
       setLoading(false);

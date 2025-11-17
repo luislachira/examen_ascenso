@@ -36,7 +36,7 @@ const HistorialDocente: React.FC = () => {
       const response = await clienteApi.get('/docente/historial');
       const datos = Array.isArray(response.data) ? response.data : [];
       setIntentos(datos);
-    } catch (err: unknown) {
+    } catch {
       setError('Error al cargar el historial de intentos');
     } finally {
       setLoading(false);

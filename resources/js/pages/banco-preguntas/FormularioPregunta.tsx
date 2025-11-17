@@ -264,7 +264,7 @@ const FormularioPregunta: React.FC<Props> = ({ pregunta, onGuardar, onCancelar }
         if (data.errors) setErrors(data.errors);
         alert(data.message || 'Error al guardar');
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     } finally {
       setLoading(false);

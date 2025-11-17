@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 
 
@@ -78,17 +78,12 @@ const ResultadosAdmin: React.FC = () => {
   const [page, setPage] = useState(1);
 
 
-  useEffect(() => {
-    cargarIntentos();
-  }, [filtros, page]);
-
   // Resetear página cuando cambian los filtros
   useEffect(() => {
     setPage(1);
   }, [filtros.search_examen, filtros.search_usuario, filtros.fecha_desde, filtros.fecha_hasta]);
 
-
-  const cargarIntentos = async () => {
+  const cargarIntentos = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -128,7 +123,11 @@ const ResultadosAdmin: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, filtros, page]);
+
+  useEffect(() => {
+    cargarIntentos();
+  }, [cargarIntentos]);
 
   const exportarCSV = async () => {
     try {

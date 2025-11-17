@@ -206,16 +206,6 @@ export const useExamenNotifications = () => {
 
   // Notificaciones de seguridad
   const notifySecurityRestriction = (field: 'rol' | 'estado', message: string) => {
-    const fieldNames = {
-      rol: 'rol de administrador',
-      estado: 'estado de cuenta'
-    };
-
-    const icons = {
-      rol: '🚫',
-      estado: '⚠️'
-    };
-
     return notifyWarning(
       `🔒 Restricción de Seguridad`,
       message,

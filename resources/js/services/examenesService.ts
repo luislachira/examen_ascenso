@@ -259,12 +259,8 @@ export const examenesService = {
     },
 
     createPostulacion: async (examenId: number, data: { nombre: string; descripcion?: string }): Promise<import('../types/examenes').Postulacion> => {
-      try {
-        const response = await clienteApi.post(`/admin/examenes/${examenId}/postulaciones`, data);
-        return response.data;
-      } catch (error: unknown) {
-        throw error;
-      }
+      const response = await clienteApi.post(`/admin/examenes/${examenId}/postulaciones`, data);
+      return response.data;
     },
 
     updatePostulacion: async (id: number, data: { nombre: string; descripcion?: string }): Promise<import('../types/examenes').Postulacion> => {

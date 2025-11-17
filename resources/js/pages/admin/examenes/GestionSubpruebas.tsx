@@ -128,7 +128,7 @@ const GestionSubpruebas: React.FC<Props> = ({ examenId, onCerrar, onSubpruebasAc
           alert(errorData.message || 'Error al crear la subprueba');
         }
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     } finally {
       setLoading(false);
@@ -199,7 +199,7 @@ const GestionSubpruebas: React.FC<Props> = ({ examenId, onCerrar, onSubpruebasAc
           alert(errorData.message || 'Error al actualizar la subprueba');
         }
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     } finally {
       setLoading(false);
@@ -228,7 +228,7 @@ const GestionSubpruebas: React.FC<Props> = ({ examenId, onCerrar, onSubpruebasAc
         const errorData = await res.json();
         alert(errorData.message || 'Error al eliminar la subprueba');
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     } finally {
       setLoading(false);

@@ -53,7 +53,7 @@ const DetalleExamen: React.FC = () => {
           try {
             const postulacionesData = await examenesService.admin.getPostulaciones(data.idExamen || data.id || 0);
             setPostulaciones(postulacionesData);
-          } catch (err: unknown) {
+          } catch {
             setPostulaciones([]);
           }
         }

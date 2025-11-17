@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -53,11 +53,7 @@ const ResultadoIntento: React.FC = () => {
   const [intento, setIntento] = useState<Intento | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    cargarResultado();
-  }, [id]);
-
-  const cargarResultado = async () => {
+  const cargarResultado = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/v1/docente/intentos/${id}/resultado`, {
@@ -83,11 +79,16 @@ const ResultadoIntento: React.FC = () => {
           setIntento(data);
         }
       }
-    } catch (error: unknown) {
+    } catch {
+      // Ignorar errores al cargar resultado
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, token]);
+
+  useEffect(() => {
+    cargarResultado();
+  }, [cargarResultado]);
 
   if (loading) {
     return (

@@ -44,7 +44,8 @@ const Paso5Ensamblador: React.FC<Props> = ({
               await examenesService.admin.actualizarPaso(examenId, 5);
               onCompletado();
             }
-          } catch (err: unknown) {
+          } catch {
+            // Ignorar errores al verificar estado del wizard
           }
         }}
       />
@@ -69,7 +70,7 @@ const Paso5Ensamblador: React.FC<Props> = ({
               } else {
                 alert('Debe asignar al menos 1 pregunta a cada subprueba antes de continuar.');
               }
-            } catch (err: unknown) {
+            } catch {
               alert('Error al verificar la completitud del examen.');
             }
           }}

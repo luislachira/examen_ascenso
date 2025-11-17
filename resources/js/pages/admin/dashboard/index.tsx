@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import { Line, Doughnut } from 'react-chartjs-2';
 import {
@@ -41,11 +41,7 @@ const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    cargarEstadisticas();
-  }, []);
-
-  const cargarEstadisticas = async () => {
+  const cargarEstadisticas = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/v1/admin/dashboard', {
@@ -66,7 +62,11 @@ const AdminDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    cargarEstadisticas();
+  }, [cargarEstadisticas]);
 
   if (loading) {
     return (

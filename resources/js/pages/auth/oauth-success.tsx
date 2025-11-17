@@ -73,7 +73,7 @@ const OAuthCallback: React.FC = () => {
                 setTimeout(() => {
                     navigate(redirectPath, { replace: true });
                 }, 100);
-            } catch (e: unknown) {
+            } catch {
                 setError('Error al procesar la autenticación. Por favor, inténtalo de nuevo.');
                 setTimeout(() => {
                     navigate('/login');

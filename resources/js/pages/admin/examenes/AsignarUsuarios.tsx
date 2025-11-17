@@ -86,7 +86,7 @@ const AsignarUsuarios: React.FC<Props> = ({ examenId, onCerrar, onAsignacionActu
         const errorData = await res.json();
         alert(errorData.message || 'Error al asignar usuarios');
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     } finally {
       setGuardando(false);

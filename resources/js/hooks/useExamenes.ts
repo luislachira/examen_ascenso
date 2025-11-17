@@ -533,7 +533,8 @@ export const useTomaExamen = (): UseTomaExamenResult => {
       const respuestasGuardadas = JSON.parse(localStorage.getItem(storageKey) || '{}');
       respuestasGuardadas[preguntaId] = opciones;
       localStorage.setItem(storageKey, JSON.stringify(respuestasGuardadas));
-    } catch (e: unknown) {
+    } catch {
+      // Ignorar errores de localStorage
     }
 
     // Intentar guardar en el servidor
@@ -729,7 +730,8 @@ export const useTomaExamen = (): UseTomaExamenResult => {
             delete nuevas[preguntaId];
             return nuevas;
           });
-        } catch (err: unknown) {
+        } catch {
+          // Ignorar errores al sincronizar respuestas pendientes
         }
       });
 

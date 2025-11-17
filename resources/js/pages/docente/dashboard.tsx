@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -15,16 +15,12 @@ interface Examen {
 }
 
 const DocenteDashboard: React.FC = () => {
-  const { token, user } = useAuth();
+  const { token } = useAuth();
   const navigate = useNavigate();
   const [examenes, setExamenes] = useState<Examen[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    cargarExamenes();
-  }, []);
-
-  const cargarExamenes = async () => {
+  const cargarExamenes = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/v1/docente/dashboard', {
@@ -38,11 +34,16 @@ const DocenteDashboard: React.FC = () => {
         const data = await response.json();
         setExamenes(data);
       }
-    } catch (error: unknown) {
+    } catch {
+      // Ignorar errores al cargar exámenes
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    cargarExamenes();
+  }, [cargarExamenes]);
 
   const iniciarExamen = (examen: Examen) => {
     // RF-D.2.1: Navegar a la página de detalle donde se mostrará el modal para seleccionar escala

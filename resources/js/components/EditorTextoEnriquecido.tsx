@@ -119,7 +119,7 @@ const EditorTextoEnriquecido: React.FC<EditorTextoEnriquecidoProps> = ({
         return response.data.url;
       }
       return null;
-    } catch (error: unknown) {
+    } catch {
       return null;
     }
   };
@@ -184,7 +184,7 @@ const EditorTextoEnriquecido: React.FC<EditorTextoEnriquecidoProps> = ({
         }
 
         actualizarContenido();
-      } catch (error: unknown) {
+      } catch {
         // Fallback: insertar solo texto
         const texto = clipboardData.getData('text/plain');
         document.execCommand('insertText', false, texto);
@@ -244,7 +244,7 @@ const EditorTextoEnriquecido: React.FC<EditorTextoEnriquecidoProps> = ({
                       img.setAttribute('src', url);
                     }
                   }
-                } catch (error: unknown) {
+                } catch {
                   // Mantener la URL original si falla
                 }
               })();
@@ -260,7 +260,7 @@ const EditorTextoEnriquecido: React.FC<EditorTextoEnriquecidoProps> = ({
         // Insertar el HTML procesado en el editor
         document.execCommand('insertHTML', false, tempDiv.innerHTML);
         actualizarContenido();
-      } catch (error: unknown) {
+      } catch {
         // Fallback: insertar solo texto
         const texto = clipboardData.getData('text/plain');
         document.execCommand('insertText', false, texto);
@@ -319,7 +319,7 @@ const EditorTextoEnriquecido: React.FC<EditorTextoEnriquecidoProps> = ({
       } else {
         alert('Error al subir la imagen');
       }
-    } catch (error: unknown) {
+    } catch {
       alert('Error al subir la imagen. Por favor, intenta de nuevo.');
     } finally {
       setUploading(false);

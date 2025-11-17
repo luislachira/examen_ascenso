@@ -52,7 +52,8 @@ const Paso4ReglasPuntaje: React.FC<Props> = ({
         try {
           const reglasPost = await examenesService.admin.getReglasPuntaje(post.idPostulacion);
           todasReglas.push(...reglasPost);
-        } catch (err: unknown) {
+        } catch {
+          // Ignorar errores al cargar reglas de una postulación específica
         }
       }
       setReglas(todasReglas);

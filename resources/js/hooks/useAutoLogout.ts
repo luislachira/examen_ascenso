@@ -76,7 +76,7 @@ export function useAutoLogout(options: UseAutoLogoutOptions = {}) {
           clearInterval(warningIntervalRef.current);
         }
       }
-    } catch (error: unknown) {
+    } catch {
       // Si hay un error (por ejemplo, 401), el interceptor de axios manejará el cierre de sesión
       setShowWarning(false);
       setTimeRemaining(0);
@@ -108,7 +108,7 @@ export function useAutoLogout(options: UseAutoLogoutOptions = {}) {
 
       // Verificar el estado actualizado
       await checkActivityStatus();
-    } catch (error: unknown) {
+    } catch {
       // Si hay un error, volver a verificar el estado
       await checkActivityStatus();
     }

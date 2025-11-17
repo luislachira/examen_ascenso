@@ -19,7 +19,7 @@ export function useClipboard(): [CopiedValue, CopyFn] {
             setCopiedText(text);
 
             return true;
-        } catch (error: unknown) {
+        } catch {
             setCopiedText(null);
 
             return false;

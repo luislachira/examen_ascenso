@@ -30,6 +30,13 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification, onDis
     return () => clearTimeout(timer);
   }, []);
 
+  const handleDismiss = useCallback(() => {
+    setIsLeaving(true);
+    setTimeout(() => {
+      onDismiss(notification.id);
+    }, 300);
+  }, [onDismiss, notification.id]);
+
   useEffect(() => {
     if (!notification.persistent && notification.duration !== 0) {
       const duration = notification.duration || 5000;
@@ -39,14 +46,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification, onDis
 
       return () => clearTimeout(timer);
     }
-  }, [notification.duration, notification.persistent]);
-
-  const handleDismiss = () => {
-    setIsLeaving(true);
-    setTimeout(() => {
-      onDismiss(notification.id);
-    }, 300);
-  };
+  }, [notification.duration, notification.persistent, handleDismiss]);
 
   const getIcon = () => {
     switch (notification.type) {

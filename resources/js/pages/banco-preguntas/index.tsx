@@ -136,7 +136,7 @@ const BancoPreguntas: React.FC = () => {
         const data = await res.json();
         alert(data.message || 'Error al eliminar la pregunta');
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     }
   };
@@ -158,7 +158,7 @@ const BancoPreguntas: React.FC = () => {
       } else {
         alert('Error al cargar la pregunta');
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     }
   };

@@ -150,7 +150,7 @@ const GestionContextos: React.FC<Props> = ({ onCerrar, onContextoActualizado }) 
         if (data.errors) setErrors(data.errors);
         else alert(data.message || 'Error al crear el contexto');
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     } finally {
       setLoading(false);
@@ -208,7 +208,7 @@ const GestionContextos: React.FC<Props> = ({ onCerrar, onContextoActualizado }) 
         if (data.errors) setErrors(data.errors);
         else alert(data.message || 'Error al actualizar el contexto');
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     } finally {
       setLoading(false);
@@ -232,7 +232,7 @@ const GestionContextos: React.FC<Props> = ({ onCerrar, onContextoActualizado }) 
         const data = await res.json();
         alert(data.message || 'Error al eliminar el contexto');
       }
-    } catch (e: unknown) {
+    } catch {
       alert('Error de conexión');
     } finally {
       setLoading(false);
