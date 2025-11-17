@@ -82,18 +82,20 @@ catch_*.txt
 /public/test-*.php
 *.txt
 !README*.txt
-!QUICK_START.md
-!AUTHENTICATION_GUIDE.md
-!DOMAIN_UPDATE.md
-!IMPLEMENTATION_SUMMARY.md
-!OAUTH_PENDING_MESSAGE.md
-!OAUTH_PENDING_SUMMARY.md
-!REMOVE_DNI_CHANGES.md
 !SOLUCION_SSL_CURL.txt
 !test_oauth_scenarios.txt
 !CONFIGURAR_OAUTH_LOCAL.txt
 !PROBAR_MICROSOFT_OAUTH.txt
-!CHECKLIST_PRODUCCION.md
+
+# Ignorar todos los archivos .md excepto README.md
+*.md
+!README.md
+
+# Ignorar scripts de PowerShell
+*.ps1
+
+# Ignorar módulos JavaScript ES6
+*.mjs
 
 # Archivos de configuración de herramientas
 .phpactor.json
