@@ -80,12 +80,8 @@ catch_*.txt
 /public/check_*.php
 /public/test-*.html
 /public/test-*.php
+# Ignorar todos los archivos .txt
 *.txt
-!README*.txt
-!SOLUCION_SSL_CURL.txt
-!test_oauth_scenarios.txt
-!CONFIGURAR_OAUTH_LOCAL.txt
-!PROBAR_MICROSOFT_OAUTH.txt
 
 # Ignorar todos los archivos .md excepto README.md
 *.md
