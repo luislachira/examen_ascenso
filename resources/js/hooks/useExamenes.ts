@@ -561,7 +561,7 @@ export const useTomaExamen = (): UseTomaExamenResult => {
             setPreguntasDisponibles(validacion.preguntas_disponibles);
             setPreguntaActualPermitida(validacion.pregunta_actual_permitida);
           }
-        } catch (err) {
+        } catch {
           // Ignorar errores en la actualización de navegación
         }
       }
