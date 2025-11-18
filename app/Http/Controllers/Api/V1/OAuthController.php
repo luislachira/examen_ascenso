@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\AbstractProvider;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Config;
 
 
 class OAuthController extends Controller
@@ -25,8 +26,31 @@ class OAuthController extends Controller
         }
 
         try {
+            // Obtener la URL base de la aplicación (usar dominio público, no IP privada)
+            $appUrl = config('app.url');
+
+            // Si APP_URL contiene una IP privada, usar el dominio configurado
+            if (preg_match('/\b192\.168\.\d+\.\d+\b/', $appUrl) ||
+                preg_match('/\b10\.\d+\.\d+\.\d+\b/', $appUrl) ||
+                preg_match('/\b172\.(1[6-9]|2\d|3[01])\.\d+\.\d+\b/', $appUrl)) {
+                // Usar el dominio público configurado o el dominio por defecto
+                $appUrl = config('app.frontend_url', 'https://examen-ascenso.com');
+            }
+
+            // Construir la URL de callback completa
+            $redirectUri = rtrim($appUrl, '/') . '/api/v1/oauth/callback/' . $provider;
+
+            Log::info('Iniciando OAuth redirect', [
+                'provider' => $provider,
+                'redirect_uri' => $redirectUri,
+                'app_url' => config('app.url')
+            ]);
+
+            // Establecer temporalmente la URL de redirect en la configuración
+            Config::set("services.{$provider}.redirect", $redirectUri);
+
             // Configurar parámetros adicionales para forzar selección de cuenta
-            /** @var AbstractProvider $driver */
+            // @phpstan-ignore-next-line - stateless() existe en la implementación concreta de Socialite
             $driver = Socialite::driver($provider)->stateless();
 
             // Para Google: Forzar que siempre muestre el selector de cuentas
@@ -46,6 +70,12 @@ class OAuthController extends Controller
 
             return $driver->redirect();
         } catch (\Exception $e) {
+            Log::error('Error al iniciar OAuth redirect', [
+                'provider' => $provider,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'message' => 'Error al iniciar autenticación OAuth',
                 'error' => $e->getMessage()
@@ -72,6 +102,23 @@ class OAuthController extends Controller
         }
 
         try {
+            // Obtener la URL base de la aplicación (usar dominio público, no IP privada)
+            $appUrl = config('app.url');
+
+            // Si APP_URL contiene una IP privada, usar el dominio configurado
+            if (preg_match('/\b192\.168\.\d+\.\d+\b/', $appUrl) ||
+                preg_match('/\b10\.\d+\.\d+\.\d+\b/', $appUrl) ||
+                preg_match('/\b172\.(1[6-9]|2\d|3[01])\.\d+\.\d+\b/', $appUrl)) {
+                // Usar el dominio público configurado o el dominio por defecto
+                $appUrl = config('app.frontend_url', 'https://examen-ascenso.com');
+            }
+
+            // Construir la URL de callback completa
+            $redirectUri = rtrim($appUrl, '/') . '/api/v1/oauth/callback/' . $provider;
+
+            // Establecer temporalmente la URL de redirect en la configuración
+            Config::set("services.{$provider}.redirect", $redirectUri);
+
             // Configurar Guzzle para deshabilitar verificación SSL en desarrollo
             $guzzleConfig = [];
             if (config('app.env') === 'local') {
@@ -81,9 +128,8 @@ class OAuthController extends Controller
             }
 
             // Obtener información del usuario desde el proveedor OAuth
-            /** @var AbstractProvider $socialiteDriver */
-            $socialiteDriver = Socialite::driver($provider);
-            $socialUser = $socialiteDriver
+            // @phpstan-ignore-next-line - setHttpClient() y stateless() existen en la implementación concreta
+            $socialUser = Socialite::driver($provider)
                 ->setHttpClient(new \GuzzleHttp\Client($guzzleConfig))
                 ->stateless()
                 ->user();

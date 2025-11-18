@@ -11,6 +11,7 @@ use App\Models\Examen;
 use App\Models\IntentoExamen;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class PreguntaController extends Controller
@@ -94,23 +95,36 @@ class PreguntaController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Pregunta::with(['categoria', 'contexto', 'opciones']);
+        try {
+            $query = Pregunta::with(['categoria', 'contexto', 'opciones']);
 
-        if ($request->filled('idCategoria')) {
-            $query->where('idCategoria', $request->idCategoria);
+            if ($request->filled('idCategoria')) {
+                $query->where('idCategoria', $request->idCategoria);
+            }
+
+            if ($request->filled('ano')) {
+                $query->where('ano', $request->ano);
+            }
+
+            if ($request->filled('codigo')) {
+                $query->where('codigo', 'LIKE', '%' . $request->codigo . '%');
+            }
+
+            $perPage = $request->integer('per_page', 10);
+            $preguntas = $query->orderBy('codigo')->paginate($perPage);
+            return response()->json($preguntas);
+        } catch (\Exception $e) {
+            Log::error('Error en PreguntaController@index: ' . $e->getMessage(), [
+                'exception' => $e,
+                'trace' => $e->getTraceAsString(),
+                'request' => $request->all()
+            ]);
+
+            return response()->json([
+                'message' => 'Error al cargar las preguntas',
+                'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
+            ], 500);
         }
-
-        if ($request->filled('ano')) {
-            $query->where('ano', $request->ano);
-        }
-
-        if ($request->filled('codigo')) {
-            $query->where('codigo', 'LIKE', '%' . $request->codigo . '%');
-        }
-
-        $perPage = $request->integer('per_page', 10);
-        $preguntas = $query->orderBy('codigo')->paginate($perPage);
-        return response()->json($preguntas);
     }
 
     public function show($id)
