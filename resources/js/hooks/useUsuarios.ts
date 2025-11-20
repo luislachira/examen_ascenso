@@ -169,7 +169,8 @@ export const useUsuarios = () => {
 
     useEffect(() => {
         fetchUsuarios(1, searchTerm, roleFilter, estadoFilter);
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Solo ejecutar una vez al montar el componente
 
     return {
         usuarios,
