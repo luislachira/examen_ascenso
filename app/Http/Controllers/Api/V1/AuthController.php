@@ -52,7 +52,8 @@ class AuthController extends Controller
         $token = $tokenResult->accessToken;
 
         // Actualizar la última actividad del token al momento de creación
-        \Illuminate\Support\Facades\DB::table('oauth_access_tokens')
+        // Usar explícitamente la conexión MySQL
+        \Illuminate\Support\Facades\DB::connection('mysql')->table('oauth_access_tokens')
             ->where('id', $tokenResult->token->id)
             ->update(['updated_at' => \Carbon\Carbon::now()]);
 

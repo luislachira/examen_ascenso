@@ -136,8 +136,22 @@ class ResultadoController extends Controller
             ->get()
             ->keyBy('idSubprueba');
 
+        // Filtrar resultados de subpruebas según el tipo de aprobación
+        $resultadosSubpruebasFiltrados = $intentoExamen->resultadosSubprueba;
+        $tipoAprobacion = $intentoExamen->postulacion->tipo_aprobacion ?? '0';
+        
+        // Si el tipo de aprobación es independiente, mostrar solo la subprueba seleccionada
+        if ($tipoAprobacion === '1' && $intentoExamen->idSubpruebaSeleccionada) {
+            $resultadosSubpruebasFiltrados = $resultadosSubpruebasFiltrados->filter(function ($resultado) use ($intentoExamen) {
+                return $resultado->idSubprueba == $intentoExamen->idSubpruebaSeleccionada;
+            })->unique('idSubprueba'); // Evitar duplicados si existen en la BD
+        } else {
+            // Para aprobación conjunta, también eliminar duplicados por idSubprueba
+            $resultadosSubpruebasFiltrados = $resultadosSubpruebasFiltrados->unique('idSubprueba');
+        }
+
         // Calcular preguntas correctas y puntaje máximo por subprueba
-        $resultadosSubpruebasConCorrectas = $intentoExamen->resultadosSubprueba->map(function ($resultado) use ($intentoExamen, $preguntasExamen, $reglasPuntaje) {
+        $resultadosSubpruebasConCorrectas = $resultadosSubpruebasFiltrados->map(function ($resultado) use ($intentoExamen, $preguntasExamen, $reglasPuntaje) {
             $idSubprueba = $resultado->idSubprueba;
 
             // Filtrar respuestas de esta subprueba
@@ -179,6 +193,12 @@ class ResultadoController extends Controller
 
         $detalle = [
             'intento' => $intentoFormateado,
+            'postulacion' => $intentoExamen->postulacion ? [
+                'idPostulacion' => $intentoExamen->postulacion->idPostulacion,
+                'nombre' => $intentoExamen->postulacion->nombre,
+                'descripcion' => $intentoExamen->postulacion->descripcion,
+                'tipo_aprobacion' => $intentoExamen->postulacion->tipo_aprobacion,
+            ] : null,
             'respuestas' => $intentoExamen->respuestas->map(function ($respuesta) {
                 return [
                     'idPregunta' => $respuesta->idPregunta,

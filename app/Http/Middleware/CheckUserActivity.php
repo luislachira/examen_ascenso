@@ -14,7 +14,7 @@ class CheckUserActivity
     /**
      * Tiempo de inactividad permitido en minutos
      */
-    const INACTIVITY_TIMEOUT_MINUTES = 30;
+    const INACTIVITY_TIMEOUT_MINUTES = 60;
 
     /**
      * Handle an incoming request.
@@ -37,7 +37,8 @@ class CheckUserActivity
             }
 
             // Obtener la última actividad del token desde la base de datos
-            $tokenRecord = DB::table('oauth_access_tokens')
+            // Usar explícitamente la conexión MySQL
+            $tokenRecord = DB::connection('mysql')->table('oauth_access_tokens')
                 ->where('id', $tokenId)
                 ->where('revoked', false)
                 ->first();
@@ -85,8 +86,8 @@ class CheckUserActivity
 
             // Si ha pasado más del tiempo permitido, revocar el token
             if ($minutesSinceLastActivity >= self::INACTIVITY_TIMEOUT_MINUTES) {
-                // Revocar el token
-                DB::table('oauth_access_tokens')
+                // Revocar el token usando explícitamente la conexión MySQL
+                DB::connection('mysql')->table('oauth_access_tokens')
                     ->where('id', $tokenId)
                     ->update(['revoked' => true]);
 
@@ -109,7 +110,8 @@ class CheckUserActivity
             $isActivityStatusCheck = str_contains($path, 'user/activity-status') || str_contains($fullUrl, 'user/activity-status');
 
             if (!$isActivityStatusCheck) {
-                DB::table('oauth_access_tokens')
+                // Actualizar usando explícitamente la conexión MySQL
+                DB::connection('mysql')->table('oauth_access_tokens')
                     ->where('id', $tokenId)
                     ->update(['updated_at' => Carbon::now()]);
 

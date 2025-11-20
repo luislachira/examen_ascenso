@@ -25,12 +25,12 @@ class SubpruebaController extends Controller
     }
 
     /**
-     * Verificar si el examen está finalizado (estado = '2')
+     * Verificar si el examen está finalizado (estado = '1' publicado o '2' finalizado)
      * Si está finalizado, lanzar una excepción
      */
     private function verificarExamenNoFinalizado(Examen $examen): void
     {
-        if ($examen->estado === '2') {
+        if ($examen->estado === '1' || $examen->estado === '2') {
             throw new \Exception(
                 'No se puede modificar un examen finalizado. Solo se puede ver su configuración, duplicarlo o eliminarlo.'
             );
@@ -43,11 +43,25 @@ class SubpruebaController extends Controller
      */
     public function index(Examen $examen)
     {
-        $subpruebas = Subprueba::where('idExamen', $examen->idExamen)
-            ->orderBy('orden')
-            ->get();
+        try {
+            $subpruebas = Subprueba::where('idExamen', $examen->idExamen)
+                ->orderBy('orden', 'asc')
+                ->orderBy('idSubprueba', 'asc') // Orden secundario por ID si orden es NULL
+                ->get();
 
-        return response()->json($subpruebas);
+            return response()->json($subpruebas);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error al obtener subpruebas', [
+                'examen_id' => $examen->idExamen ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'message' => 'Error al cargar las subpruebas',
+                'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
+            ], 500);
+        }
     }
 
     /**
@@ -60,6 +74,19 @@ class SubpruebaController extends Controller
             'orden' => 'required|integer|min:1',
             'puntaje_por_pregunta' => 'nullable|numeric|min:0|max:10',
             'duracion_minutos' => 'nullable|integer|min:0',
+        ], [
+            'nombre.required' => 'El nombre es obligatorio',
+            'nombre.string' => 'El nombre debe ser texto',
+            'nombre.min' => 'El nombre debe tener al menos 5 caracteres',
+            'nombre.max' => 'El nombre no puede exceder 100 caracteres',
+            'orden.required' => 'El orden es obligatorio',
+            'orden.integer' => 'El orden debe ser un número entero',
+            'orden.min' => 'El orden debe ser al menos 1',
+            'puntaje_por_pregunta.numeric' => 'El puntaje por pregunta debe ser un número',
+            'puntaje_por_pregunta.min' => 'El puntaje por pregunta debe ser al menos 0',
+            'puntaje_por_pregunta.max' => 'El puntaje por pregunta no puede exceder 10',
+            'duracion_minutos.integer' => 'La duración en minutos debe ser un número entero',
+            'duracion_minutos.min' => 'La duración en minutos debe ser al menos 0',
         ]);
 
         // Verificar que no haya otra subprueba con el mismo orden
@@ -70,6 +97,15 @@ class SubpruebaController extends Controller
         if ($ordenExistente) {
             return response()->json([
                 'message' => "Ya existe una subprueba con el orden {$request->orden}",
+            ], 422);
+        }
+
+        // Verificar que el examen no esté finalizado
+        try {
+            $this->verificarExamenNoFinalizado($examen);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
             ], 422);
         }
 
@@ -103,6 +139,20 @@ class SubpruebaController extends Controller
             'puntaje_por_pregunta' => 'required|numeric|min:0|max:10',
             'duracion_minutos' => 'required|integer|min:1',
             'orden' => 'required|integer|min:1',
+        ], [
+            'nombre.required' => 'El nombre es obligatorio',
+            'nombre.string' => 'El nombre debe ser texto',
+            'nombre.max' => 'El nombre no puede exceder 255 caracteres',
+            'puntaje_por_pregunta.required' => 'El puntaje por pregunta es obligatorio',
+            'puntaje_por_pregunta.numeric' => 'El puntaje por pregunta debe ser un número',
+            'puntaje_por_pregunta.min' => 'El puntaje por pregunta debe ser al menos 0',
+            'puntaje_por_pregunta.max' => 'El puntaje por pregunta no puede exceder 10',
+            'duracion_minutos.required' => 'La duración en minutos es obligatoria',
+            'duracion_minutos.integer' => 'La duración en minutos debe ser un número entero',
+            'duracion_minutos.min' => 'La duración en minutos debe ser al menos 1',
+            'orden.required' => 'El orden es obligatorio',
+            'orden.integer' => 'El orden debe ser un número entero',
+            'orden.min' => 'El orden debe ser al menos 1',
         ]);
 
         // Verificar que el examen no esté finalizado

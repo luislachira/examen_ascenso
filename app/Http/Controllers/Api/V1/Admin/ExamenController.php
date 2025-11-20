@@ -46,15 +46,80 @@ class ExamenController extends Controller
     }
 
     /**
-     * Verificar si el examen está finalizado (estado = '2')
+     * Verificar si el examen está finalizado (estado = '1' publicado o '2' finalizado)
      * Si está finalizado, lanzar una excepción
      */
     private function verificarExamenNoFinalizado(Examen $examen): void
     {
-        if ($examen->estado === '2') {
+        if ($examen->estado === '1' || $examen->estado === '2') {
             throw new \Exception(
                 'No se puede modificar un examen finalizado. Solo se puede ver su configuración, duplicarlo o eliminarlo.'
             );
+        }
+    }
+
+    /**
+     * Helper para formatear fechas en getDatosPaso
+     * Maneja diferentes tipos de valores de fecha de forma segura
+     */
+    private function formatearFechaParaPaso(Examen $examen, string $attribute): ?string
+    {
+        try {
+            // Primero intentar obtener el valor usando el accessor (puede devolver Carbon)
+            $value = null;
+            try {
+                $value = $examen->$attribute;
+            } catch (\Exception $e) {
+                // Si falla, intentar obtener el valor raw
+                try {
+                    $value = $examen->getRawOriginal($attribute);
+                } catch (\Exception $e2) {
+                    // Si ambos fallan, retornar null
+                    return null;
+                }
+            }
+
+            if (!$value) {
+                return null;
+            }
+
+            // Si es una instancia de Carbon, formatear directamente
+            if ($value instanceof \Carbon\Carbon) {
+                return $value->format('d-m-Y H:i');
+            }
+
+            // Si es string, intentar parsearlo
+            if (is_string($value)) {
+                if (trim($value) === '') {
+                    return null;
+                }
+                try {
+                    return \Carbon\Carbon::parse($value)->format('d-m-Y H:i');
+                } catch (\Exception $e) {
+                    // Si no se puede parsear, devolver el valor original
+                    Log::warning('Error al parsear fecha en formatearFechaParaPaso', [
+                        'attribute' => $attribute,
+                        'value' => $value,
+                        'error' => $e->getMessage()
+                    ]);
+                    return $value;
+                }
+            }
+
+            // Si es un objeto DateTime, convertirlo a Carbon
+            if ($value instanceof \DateTime) {
+                return \Carbon\Carbon::instance($value)->format('d-m-Y H:i');
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            Log::warning('Error al formatear fecha en getDatosPaso', [
+                'attribute' => $attribute,
+                'examen_id' => $examen->idExamen ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return null;
         }
     }
 
@@ -82,66 +147,97 @@ class ExamenController extends Controller
         $ahora = Carbon::now();
 
         // PRIORIDAD 1: Si la fecha_fin_vigencia ha pasado, finalizar inmediatamente
-        if ($examen->fecha_fin_vigencia && $ahora->gte($examen->fecha_fin_vigencia)) {
-            // Cerrar todos los intentos en progreso
-            $intentosEnProgreso = $examen->intentos()->where('estado', 'iniciado')->get();
-            foreach ($intentosEnProgreso as $intento) {
-                $intento->estado = 'enviado';
-                $intento->hora_fin = $ahora;
-                $intento->save();
-            }
+        if ($examen->fecha_fin_vigencia) {
+            $fechaFinRaw = $examen->getRawOriginal('fecha_fin_vigencia');
+            $ahoraStr = \App\Services\FechaService::ahoraString();
 
-            $examen->estado = '2';
-            $examen->save();
-            Log::info('Examen finalizado automáticamente por fecha_fin_vigencia', [
-                'examen_id' => $examen->idExamen,
-                'codigo_examen' => $examen->codigo_examen,
-                'fecha_fin_vigencia' => $examen->fecha_fin_vigencia,
-                'intentos_cerrados' => $intentosEnProgreso->count(),
-            ]);
-            return true;
+            if ($fechaFinRaw && strcmp($ahoraStr, $fechaFinRaw) >= 0) {
+                // Cerrar todos los intentos en progreso
+                $intentosEnProgreso = $examen->intentos()->where('estado', 'iniciado')->get();
+                foreach ($intentosEnProgreso as $intento) {
+                    $intento->estado = 'enviado';
+                    $intento->hora_fin = $ahora;
+                    $intento->save();
+                }
+
+                $examen->estado = '2';
+                $examen->save();
+                Log::info('Examen finalizado automáticamente por fecha_fin_vigencia', [
+                    'examen_id' => $examen->idExamen,
+                    'codigo_examen' => $examen->codigo_examen,
+                    'fecha_fin_vigencia' => $fechaFinRaw,
+                    'intentos_cerrados' => $intentosEnProgreso->count(),
+                ]);
+                return true;
+            }
         }
 
-        $todosFinalizados = true;
-        $todosTiempoAgotado = true;
+        // PRIORIDAD 2: Verificar si todos los usuarios que deben dar el examen han finalizado
+        $usuariosQueDebenFinalizar = [];
 
-        // Obtener todos los intentos del examen
-        $intentos = $examen->intentos()->get();
+        if ($examen->tipo_acceso === 'publico') {
+            // Si es público: todos los usuarios de tipo docente deben finalizar
+            $usuariosQueDebenFinalizar = \App\Models\Usuario::where('rol', \App\Models\Usuario::ROL_DOCENTE)
+                ->where('estado', \App\Models\Usuario::ESTADO_ACTIVO)
+                ->pluck('idUsuario')
+                ->toArray();
+        } else {
+            // Si es privado: todos los usuarios asignados deben finalizar
+            $usuariosQueDebenFinalizar = $examen->usuariosAsignados()
+                ->pluck('idUsuario')
+                ->toArray();
+        }
 
-        if ($intentos->isEmpty()) {
-            // Si no hay intentos, no se finaliza automáticamente
+        // Si no hay usuarios que deban finalizar, no se puede finalizar el examen
+        if (empty($usuariosQueDebenFinalizar)) {
+            Log::info('Examen no puede finalizarse: no hay usuarios que deban finalizarlo', [
+                'examen_id' => $examen->idExamen,
+                'codigo_examen' => $examen->codigo_examen,
+                'tipo_acceso' => $examen->tipo_acceso,
+            ]);
             return false;
         }
 
-        foreach ($intentos as $intento) {
-            // Si hay algún intento en progreso (estado 'iniciado')
-            if ($intento->estado === 'iniciado') {
-                $todosFinalizados = false;
+        // Verificar que todos los usuarios tengan al menos un intento finalizado (estado 'enviado')
+        $usuariosConIntentoFinalizado = $examen->intentos()
+            ->where('estado', 'enviado')
+            ->distinct()
+            ->pluck('idUsuario')
+            ->toArray();
 
-                // Verificar si el temporizador ha terminado
-                $horaFinEsperada = Carbon::parse($intento->hora_inicio)->addMinutes($examen->tiempo_limite);
+        // Verificar si todos los usuarios que deben finalizar tienen un intento finalizado
+        $todosHanFinalizado = true;
+        $usuariosPendientes = [];
 
-                if ($ahora->lt($horaFinEsperada)) {
-                    // Aún hay tiempo, no se puede finalizar
-                    $todosTiempoAgotado = false;
-                }
+        foreach ($usuariosQueDebenFinalizar as $idUsuario) {
+            if (!in_array($idUsuario, $usuariosConIntentoFinalizado)) {
+                $todosHanFinalizado = false;
+                $usuariosPendientes[] = $idUsuario;
             }
         }
 
-        // Finalizar el examen si:
-        // 1. Todos los intentos están finalizados, O
-        // 2. Todos los intentos iniciados han excedido el tiempo límite
-        if ($todosFinalizados || ($todosTiempoAgotado && !$todosFinalizados)) {
+        if ($todosHanFinalizado) {
             $examen->estado = '2';
             $examen->save();
 
-            Log::info('Examen finalizado automáticamente', [
+            Log::info('Examen finalizado automáticamente: todos los usuarios han finalizado', [
                 'examen_id' => $examen->idExamen,
                 'codigo_examen' => $examen->codigo_examen,
-                'razon' => $todosFinalizados ? 'Todos los intentos finalizados' : 'Todos los temporizadores agotados',
+                'tipo_acceso' => $examen->tipo_acceso,
+                'total_usuarios' => count($usuariosQueDebenFinalizar),
+                'usuarios_finalizados' => count($usuariosConIntentoFinalizado),
             ]);
 
             return true;
+        } else {
+            Log::debug('Examen no finalizado: hay usuarios pendientes', [
+                'examen_id' => $examen->idExamen,
+                'codigo_examen' => $examen->codigo_examen,
+                'tipo_acceso' => $examen->tipo_acceso,
+                'total_usuarios_requeridos' => count($usuariosQueDebenFinalizar),
+                'usuarios_finalizados' => count($usuariosConIntentoFinalizado),
+                'usuarios_pendientes' => count($usuariosPendientes),
+            ]);
         }
 
         return false;
@@ -1012,16 +1108,18 @@ class ExamenController extends Controller
             }
         }
 
-        // Si se está cambiando de Borrador (0) a Publicado (1) y no hay fecha_inicio_vigencia establecida
-        if ($examen->estado === '0' && $nuevoEstado === '1' && !$examen->fecha_inicio_vigencia) {
-            // Si se proporciona una fecha en el request, usarla; sino, usar la fecha actual
+        // Si se está cambiando a Publicado (1), actualizar fecha_inicio_vigencia para tener concordancia
+        if ($nuevoEstado === '1') {
+            // Si se proporciona una fecha en el request, usarla; sino, usar la fecha/hora actual
             if ($request->filled('fecha_inicio_vigencia')) {
                 $fecha = str_replace('T', ' ', $request->fecha_inicio_vigencia) . ':00';
                 $examen->fecha_inicio_vigencia = $fecha;
             } else {
-                $examen->fecha_inicio_vigencia = Carbon::now(config('app.timezone'))->format('Y-m-d H:i:s');
+                // Usar FechaService para mantener consistencia
+                $examen->fecha_inicio_vigencia = \App\Services\FechaService::ahoraString();
             }
         } elseif ($request->filled('fecha_inicio_vigencia')) {
+            // Si no se está publicando pero se proporciona fecha, actualizarla
             // Parsear la fecha como absoluta (sin conversión de zona horaria)
             // Convertir a formato MySQL datetime y guardar directamente sin conversión
             $fecha = str_replace('T', ' ', $request->fecha_inicio_vigencia) . ':00';
@@ -1102,72 +1200,85 @@ class ExamenController extends Controller
      */
     public function ensamblar(Examen $examen)
     {
-        $examen->load(['preguntas.opciones', 'preguntas.categoria', 'preguntas.contexto', 'subpruebas']);
+        try {
+            $examen->load(['preguntas.opciones', 'preguntas.categoria', 'preguntas.contexto', 'subpruebas']);
 
-        // Obtener todas las preguntas disponibles con filtros
-        $preguntasDisponibles = Pregunta::with(['categoria', 'contexto', 'opciones'])
-            ->orderBy('codigo')
-            ->get()
-            ->map(function ($pregunta) {
-                return [
-                    'idPregunta' => $pregunta->idPregunta,
-                    'codigo' => $pregunta->codigo,
-                    'enunciado' => $pregunta->enunciado,
-                    'ano' => $pregunta->ano,
-                    'categoria' => $pregunta->categoria ? [
-                        'idCategoria' => $pregunta->categoria->idCategoria,
-                        'nombre' => $pregunta->categoria->nombre,
-                    ] : null,
-                    'contexto' => $pregunta->contexto ? [
-                        'idContexto' => $pregunta->contexto->idContexto,
-                        'titulo' => $pregunta->contexto->titulo,
-                    ] : null,
-                    'opciones' => $pregunta->opciones->map(function ($opcion) {
-                        return [
-                            'idOpcion' => $opcion->idOpcion,
-                            'contenido' => $opcion->contenido,
-                            'es_correcta' => (bool) $opcion->es_correcta,
-                        ];
-                    })->values()->all(),
-                ];
-            });
+            // Obtener todas las preguntas disponibles con filtros
+            $preguntasDisponibles = Pregunta::with(['categoria', 'contexto', 'opciones'])
+                ->orderBy('codigo')
+                ->get()
+                ->map(function ($pregunta) {
+                    return [
+                        'idPregunta' => $pregunta->idPregunta,
+                        'codigo' => $pregunta->codigo,
+                        'enunciado' => $pregunta->enunciado,
+                        'ano' => $pregunta->ano,
+                        'categoria' => $pregunta->categoria ? [
+                            'idCategoria' => $pregunta->categoria->idCategoria,
+                            'nombre' => $pregunta->categoria->nombre,
+                        ] : null,
+                        'contexto' => $pregunta->contexto ? [
+                            'idContexto' => $pregunta->contexto->idContexto,
+                            'titulo' => $pregunta->contexto->titulo,
+                        ] : null,
+                        'opciones' => $pregunta->opciones->map(function ($opcion) {
+                            return [
+                                'idOpcion' => $opcion->idOpcion,
+                                'contenido' => $opcion->contenido,
+                                'es_correcta' => (bool) $opcion->es_correcta,
+                            ];
+                        })->values()->all(),
+                    ];
+                });
 
-        // Organizar preguntas por subprueba
-        $preguntasPorSubprueba = [];
-        foreach ($examen->subpruebas as $subprueba) {
-            $preguntasPorSubprueba[$subprueba->idSubprueba] = $examen->preguntas->filter(function ($pregunta) use ($subprueba) {
-                return $pregunta->pivot->idSubprueba == $subprueba->idSubprueba;
-            })->map(function ($pregunta) {
-                return [
-                    'idPregunta' => $pregunta->idPregunta,
-                    'codigo' => $pregunta->codigo,
-                    'enunciado' => $pregunta->enunciado,
-                    'categoria' => $pregunta->categoria ? [
-                        'idCategoria' => $pregunta->categoria->idCategoria,
-                        'nombre' => $pregunta->categoria->nombre,
-                    ] : null,
-                    'contexto' => $pregunta->contexto ? [
-                        'idContexto' => $pregunta->contexto->idContexto,
-                        'titulo' => $pregunta->contexto->titulo,
-                    ] : null,
-                    'opciones' => $pregunta->opciones->map(function ($opcion) {
-                        return [
-                            'idOpcion' => $opcion->idOpcion,
-                            'contenido' => $opcion->contenido,
-                            'es_correcta' => (bool) $opcion->es_correcta,
-                        ];
-                    })->values()->all(),
-                    'orden' => $pregunta->pivot->orden,
-                ];
-            })->values();
+            // Organizar preguntas por subprueba
+            $preguntasPorSubprueba = [];
+            foreach ($examen->subpruebas as $subprueba) {
+                $preguntasPorSubprueba[$subprueba->idSubprueba] = $examen->preguntas->filter(function ($pregunta) use ($subprueba) {
+                    return $pregunta->pivot && $pregunta->pivot->idSubprueba == $subprueba->idSubprueba;
+                })->map(function ($pregunta) {
+                    return [
+                        'idPregunta' => $pregunta->idPregunta,
+                        'codigo' => $pregunta->codigo,
+                        'enunciado' => $pregunta->enunciado,
+                        'categoria' => $pregunta->categoria ? [
+                            'idCategoria' => $pregunta->categoria->idCategoria,
+                            'nombre' => $pregunta->categoria->nombre,
+                        ] : null,
+                        'contexto' => $pregunta->contexto ? [
+                            'idContexto' => $pregunta->contexto->idContexto,
+                            'titulo' => $pregunta->contexto->titulo,
+                        ] : null,
+                        'opciones' => $pregunta->opciones->map(function ($opcion) {
+                            return [
+                                'idOpcion' => $opcion->idOpcion,
+                                'contenido' => $opcion->contenido,
+                                'es_correcta' => (bool) $opcion->es_correcta,
+                            ];
+                        })->values()->all(),
+                        'orden' => $pregunta->pivot->orden ?? 0,
+                    ];
+                })->values();
+            }
+
+            return response()->json([
+                'examen' => $examen,
+                'subpruebas' => $examen->subpruebas,
+                'preguntas_por_subprueba' => $preguntasPorSubprueba,
+                'preguntas_disponibles' => $preguntasDisponibles,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en método ensamblar', [
+                'examen_id' => $examen->idExamen ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'message' => 'Error al cargar los datos del ensamblador',
+                'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
+            ], 500);
         }
-
-        return response()->json([
-            'examen' => $examen,
-            'subpruebas' => $examen->subpruebas,
-            'preguntas_por_subprueba' => $preguntasPorSubprueba,
-            'preguntas_disponibles' => $preguntasDisponibles,
-        ]);
     }
 
     /**
@@ -1754,37 +1865,73 @@ class ExamenController extends Controller
      */
     public function validarAccesoPaso(Request $request, $id)
     {
-        $request->validate([
-            'paso' => 'required|integer|min:1|max:6',
-        ]);
+        try {
+            $request->validate([
+                'paso' => 'required|integer|min:1|max:6',
+            ]);
 
-        $examen = Examen::where('idExamen', $id)->firstOrFail();
+            $examen = Examen::where('idExamen', $id)->firstOrFail();
 
-        $examen->load(['subpruebas', 'postulaciones.reglasPuntaje']);
-
-        $completitudService = new ExamenCompletitudService();
-        $puedeAcceder = $completitudService->puedeAccederPaso($examen, $request->paso);
-
-        if (!$puedeAcceder) {
-            $estadoPasos = $completitudService->obtenerEstadoPasos($examen);
-            $pasosIncompletos = [];
-
-            for ($i = 1; $i < $request->paso; $i++) {
-                if (!$estadoPasos["paso{$i}"]) {
-                    $pasosIncompletos[] = $i;
+            try {
+                // Cargar relaciones de forma segura
+                $examen->load(['subpruebas']);
+                // Cargar postulaciones y reglas con validación
+                $examen->load(['postulaciones']);
+                if ($examen->postulaciones && $examen->postulaciones->count() > 0) {
+                    $examen->postulaciones->load(['reglasPuntaje' => function ($query) {
+                        $query->whereHas('subprueba');
+                    }]);
+                }
+            } catch (\Exception $e) {
+                Log::warning('Error al cargar relaciones en validarAccesoPaso', [
+                    'examen_id' => $examen->idExamen,
+                    'error' => $e->getMessage()
+                ]);
+                // Continuar con relaciones vacías si hay error
+                if (!$examen->relationLoaded('subpruebas')) {
+                    $examen->setRelation('subpruebas', collect([]));
+                }
+                if (!$examen->relationLoaded('postulaciones')) {
+                    $examen->setRelation('postulaciones', collect([]));
                 }
             }
 
-            return response()->json([
-                'puede_acceder' => false,
-                'mensaje' => 'No puede acceder a este paso. Debe completar los pasos anteriores primero.',
-                'pasos_incompletos' => $pasosIncompletos,
-            ], 403);
-        }
+            $completitudService = new ExamenCompletitudService();
+            $puedeAcceder = $completitudService->puedeAccederPaso($examen, $request->paso);
 
-        return response()->json([
-            'puede_acceder' => true,
-        ]);
+            if (!$puedeAcceder) {
+                $estadoPasos = $completitudService->obtenerEstadoPasos($examen);
+                $pasosIncompletos = [];
+
+                for ($i = 1; $i < $request->paso; $i++) {
+                    if (!$estadoPasos["paso{$i}"]) {
+                        $pasosIncompletos[] = $i;
+                    }
+                }
+
+                return response()->json([
+                    'puede_acceder' => false,
+                    'mensaje' => 'No puede acceder a este paso. Debe completar los pasos anteriores primero.',
+                    'pasos_incompletos' => $pasosIncompletos,
+                ], 403);
+            }
+
+            return response()->json([
+                'puede_acceder' => true,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en validarAccesoPaso', [
+                'examen_id' => $id ?? null,
+                'paso' => $request->paso ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'message' => 'Error al validar el acceso al paso',
+                'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
+            ], 500);
+        }
     }
 
     /**
@@ -1798,153 +1945,364 @@ class ExamenController extends Controller
      */
     public function getDatosPaso($id, $paso)
     {
-        $examen = Examen::where('idExamen', $id)->firstOrFail();
-
-        switch ($paso) {
-            case 1:
-                // Paso 1: Solo datos básicos (sin usar ExamenResource para evitar cargar todas las relaciones)
-                $examen->load(['tipoConcurso']);
-                return response()->json([
-                    'data' => [
-                        'idExamen' => $examen->idExamen,
-                        'id' => $examen->idExamen, // Compatibilidad con frontend
-                        'codigo_examen' => $examen->codigo_examen,
-                        'codigo' => $examen->codigo_examen, // Compatibilidad con frontend
-                        'titulo' => $examen->titulo,
-                        'descripcion' => $examen->descripcion,
-                        'idTipoConcurso' => $examen->idTipoConcurso,
-                        'tiempo_limite' => $examen->tiempo_limite,
-                        'duracion_minutos' => $examen->tiempo_limite, // Compatibilidad con frontend
-                        'tipo_acceso' => $examen->tipo_acceso,
-                        'publico' => $examen->tipo_acceso === 'publico', // Compatibilidad con frontend
-                        'estado' => $examen->estado ?? '0',
-                        'created_at' => $examen->created_at ? $examen->created_at->format('d-m-Y') : null,
-                        'updated_at' => $examen->updated_at ? $examen->updated_at->format('d-m-Y') : null,
-                        'fecha_creacion' => $examen->created_at ? $examen->created_at->format('d-m-Y') : null,
-                        'fecha_inicio_vigencia' => $examen->fecha_inicio_vigencia
-                            ? ($examen->fecha_inicio_vigencia instanceof \Carbon\Carbon
-                                ? $examen->fecha_inicio_vigencia->format('d-m-Y')
-                                : (is_string($examen->fecha_inicio_vigencia)
-                                    ? $examen->fecha_inicio_vigencia
-                                    : null))
-                            : null,
-                        'fecha_fin_vigencia' => $examen->fecha_fin_vigencia
-                            ? ($examen->fecha_fin_vigencia instanceof \Carbon\Carbon
-                                ? $examen->fecha_fin_vigencia->format('d-m-Y')
-                                : (is_string($examen->fecha_fin_vigencia)
-                                    ? $examen->fecha_fin_vigencia
-                                    : null))
-                            : null,
-                        'paso_actual' => $examen->paso_actual ?? 0,
-                        'fecha_publicacion' => $examen->fecha_publicacion ? $examen->fecha_publicacion->format('d-m-Y') : null,
-                        'fecha_finalizacion' => $examen->fecha_finalizacion ? $examen->fecha_finalizacion->format('d-m-Y') : null,
-                        'tipoConcurso' => $examen->relationLoaded('tipoConcurso') && $examen->tipoConcurso ? [
-                            'idTipoConcurso' => $examen->tipoConcurso->idTipoConcurso,
-                            'nombre' => $examen->tipoConcurso->nombre,
-                        ] : null,
-                    ],
+        try {
+            // Cargar el examen de forma segura, manejando posibles errores del evento retrieved
+            try {
+                $examen = Examen::where('idExamen', $id)->firstOrFail();
+            } catch (\Exception $e) {
+                Log::error('Error al cargar examen en getDatosPaso', [
+                    'examen_id' => $id,
+                    'paso' => $paso,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
                 ]);
+                throw $e;
+            }
 
-            case 2:
-                // Paso 2: Subpruebas
-                $examen->load(['subpruebas']);
-                return response()->json([
-                    'data' => [
-                        'idExamen' => $examen->idExamen,
-                        'subpruebas' => $examen->subpruebas->map(function ($subprueba) {
-                            return [
-                                'idSubprueba' => $subprueba->idSubprueba,
-                                'nombre' => $subprueba->nombre,
-                                'puntaje_por_pregunta' => $subprueba->puntaje_por_pregunta,
-                                'duracion_minutos' => $subprueba->duracion_minutos,
-                                'orden' => $subprueba->orden,
-                            ];
-                        }),
-                    ],
-                ]);
+            switch ($paso) {
+                case 1:
+                    // Paso 1: Solo datos básicos (sin usar ExamenResource para evitar cargar todas las relaciones)
+                    try {
+                        $examen->load(['tipoConcurso']);
+                    } catch (\Exception $e) {
+                        // Si hay error al cargar tipoConcurso, continuar sin él
+                        Log::warning('Error al cargar tipoConcurso en paso 1', [
+                            'examen_id' => $examen->idExamen,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
 
-            case 3:
-                // Paso 3: Postulaciones
-                $examen->load(['postulaciones']);
-                return response()->json([
-                    'data' => [
-                        'idExamen' => $examen->idExamen,
-                        'postulaciones' => $examen->postulaciones->map(function ($postulacion) {
-                            return [
-                                'idPostulacion' => $postulacion->idPostulacion,
-                                'nombre' => $postulacion->nombre,
-                                'descripcion' => $postulacion->descripcion,
-                                'tipo_aprobacion' => $postulacion->tipo_aprobacion ?? '0',
-                            ];
-                        }),
-                    ],
-                ]);
+                    try {
+                        // Formatear fechas de forma segura
+                        $fechaInicioVigencia = null;
+                        $fechaFinVigencia = null;
+                        try {
+                            $fechaInicioVigencia = $this->formatearFechaParaPaso($examen, 'fecha_inicio_vigencia');
+                        } catch (\Exception $e) {
+                            Log::warning('Error al formatear fecha_inicio_vigencia en paso 1', [
+                                'examen_id' => $examen->idExamen,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                        try {
+                            $fechaFinVigencia = $this->formatearFechaParaPaso($examen, 'fecha_fin_vigencia');
+                        } catch (\Exception $e) {
+                            Log::warning('Error al formatear fecha_fin_vigencia en paso 1', [
+                                'examen_id' => $examen->idExamen,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
 
-            case 4:
-                // Paso 4: Reglas de puntaje (incluye postulaciones y subpruebas)
-                $examen->load(['postulaciones.reglasPuntaje.subprueba', 'subpruebas']);
-                return response()->json([
-                    'data' => [
-                        'idExamen' => $examen->idExamen,
-                        'postulaciones' => $examen->postulaciones->map(function ($postulacion) {
-                            return [
-                                'idPostulacion' => $postulacion->idPostulacion,
-                                'nombre' => $postulacion->nombre,
-                                'descripcion' => $postulacion->descripcion,
-                                'tipo_aprobacion' => $postulacion->tipo_aprobacion ?? '0',
-                                'reglasPuntaje' => $postulacion->reglasPuntaje->map(function ($regla) {
-                                    return [
-                                        'idRegla' => $regla->idRegla,
-                                        'idSubprueba' => $regla->idSubprueba,
-                                        'puntaje_correcto' => $regla->puntaje_correcto,
-                                        'puntaje_incorrecto' => $regla->puntaje_incorrecto,
-                                        'puntaje_en_blanco' => $regla->puntaje_en_blanco,
-                                        'puntaje_minimo_subprueba' => $regla->puntaje_minimo_subprueba,
-                                        'subprueba' => $regla->subprueba ? [
-                                            'idSubprueba' => $regla->subprueba->idSubprueba,
-                                            'nombre' => $regla->subprueba->nombre,
-                                        ] : null,
+                        // Obtener valores de forma segura para evitar errores con accessors
+                        $createdAt = null;
+                        $updatedAt = null;
+                        $fechaPublicacion = null;
+                        $fechaFinalizacion = null;
+
+                        try {
+                            $createdAtValue = $examen->getRawOriginal('created_at');
+                            if ($createdAtValue) {
+                                try {
+                                    $createdAt = \Carbon\Carbon::parse($createdAtValue)->format('d-m-Y');
+                                } catch (\Exception $e) {
+                                    $createdAt = is_string($createdAtValue) ? $createdAtValue : null;
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            // Ignorar error
+                        }
+
+                        try {
+                            $updatedAtValue = $examen->getRawOriginal('updated_at');
+                            if ($updatedAtValue) {
+                                try {
+                                    $updatedAt = \Carbon\Carbon::parse($updatedAtValue)->format('d-m-Y');
+                                } catch (\Exception $e) {
+                                    $updatedAt = is_string($updatedAtValue) ? $updatedAtValue : null;
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            // Ignorar error
+                        }
+
+                        try {
+                            $fechaPublicacionValue = $examen->getRawOriginal('fecha_publicacion');
+                            if ($fechaPublicacionValue) {
+                                try {
+                                    $fechaPublicacion = \Carbon\Carbon::parse($fechaPublicacionValue)->format('d-m-Y');
+                                } catch (\Exception $e) {
+                                    $fechaPublicacion = is_string($fechaPublicacionValue) ? $fechaPublicacionValue : null;
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            // Ignorar error
+                        }
+
+                        try {
+                            $fechaFinalizacionValue = $examen->getRawOriginal('fecha_finalizacion');
+                            if ($fechaFinalizacionValue) {
+                                try {
+                                    $fechaFinalizacion = \Carbon\Carbon::parse($fechaFinalizacionValue)->format('d-m-Y');
+                                } catch (\Exception $e) {
+                                    $fechaFinalizacion = is_string($fechaFinalizacionValue) ? $fechaFinalizacionValue : null;
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            // Ignorar error
+                        }
+
+                        return response()->json([
+                            'data' => [
+                                'idExamen' => $examen->idExamen,
+                                'id' => $examen->idExamen, // Compatibilidad con frontend
+                                'codigo_examen' => $examen->codigo_examen ?? null,
+                                'codigo' => $examen->codigo_examen ?? null, // Compatibilidad con frontend
+                                'titulo' => $examen->titulo ?? null,
+                                'descripcion' => $examen->descripcion ?? null,
+                                'idTipoConcurso' => $examen->idTipoConcurso ?? null,
+                                'tiempo_limite' => $examen->tiempo_limite ?? 0,
+                                'duracion_minutos' => $examen->tiempo_limite ?? 0, // Compatibilidad con frontend
+                                'tipo_acceso' => $examen->tipo_acceso ?? 'publico',
+                                'publico' => ($examen->tipo_acceso ?? 'publico') === 'publico', // Compatibilidad con frontend
+                                'estado' => $examen->estado ?? '0',
+                                'created_at' => $createdAt,
+                                'updated_at' => $updatedAt,
+                                'fecha_creacion' => $createdAt,
+                                'fecha_inicio_vigencia' => $fechaInicioVigencia,
+                                'fecha_fin_vigencia' => $fechaFinVigencia,
+                                'paso_actual' => $examen->paso_actual ?? 0,
+                                'fecha_publicacion' => $fechaPublicacion,
+                                'fecha_finalizacion' => $fechaFinalizacion,
+                                'tipoConcurso' => $examen->relationLoaded('tipoConcurso') && $examen->tipoConcurso ? [
+                                    'idTipoConcurso' => $examen->tipoConcurso->idTipoConcurso,
+                                    'nombre' => $examen->tipoConcurso->nombre,
+                                ] : null,
+                            ],
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::error('Error al construir respuesta en paso 1', [
+                            'examen_id' => $examen->idExamen,
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString()
+                        ]);
+                        throw $e; // Re-lanzar para que sea capturado por el catch general
+                    }
+
+                case 2:
+                    // Paso 2: Subpruebas
+                    try {
+                        $examen->load(['subpruebas']);
+                    } catch (\Exception $e) {
+                        Log::warning('Error al cargar subpruebas en paso 2', [
+                            'examen_id' => $examen->idExamen,
+                            'error' => $e->getMessage()
+                        ]);
+                        $examen->setRelation('subpruebas', collect([]));
+                    }
+                    return response()->json([
+                        'data' => [
+                            'idExamen' => $examen->idExamen,
+                            'subpruebas' => $examen->subpruebas->map(function ($subprueba) {
+                                return [
+                                    'idSubprueba' => $subprueba->idSubprueba,
+                                    'nombre' => $subprueba->nombre,
+                                    'puntaje_por_pregunta' => $subprueba->puntaje_por_pregunta,
+                                    'duracion_minutos' => $subprueba->duracion_minutos,
+                                    'orden' => $subprueba->orden,
+                                ];
+                            }),
+                        ],
+                    ]);
+
+                case 3:
+                    // Paso 3: Postulaciones
+                    try {
+                        $examen->load(['postulaciones']);
+                    } catch (\Exception $e) {
+                        Log::warning('Error al cargar postulaciones en paso 3', [
+                            'examen_id' => $examen->idExamen,
+                            'error' => $e->getMessage()
+                        ]);
+                        $examen->setRelation('postulaciones', collect([]));
+                    }
+                    return response()->json([
+                        'data' => [
+                            'idExamen' => $examen->idExamen,
+                            'postulaciones' => $examen->postulaciones->map(function ($postulacion) {
+                                return [
+                                    'idPostulacion' => $postulacion->idPostulacion,
+                                    'nombre' => $postulacion->nombre,
+                                    'descripcion' => $postulacion->descripcion,
+                                    'tipo_aprobacion' => $postulacion->tipo_aprobacion ?? '0',
+                                ];
+                            }),
+                        ],
+                    ]);
+
+                case 4:
+                    // Paso 4: Reglas de puntaje (incluye postulaciones y subpruebas)
+                    try {
+                        // Cargar relaciones de forma segura
+                        $examen->load(['postulaciones', 'subpruebas']);
+                        // Cargar reglas de puntaje con validación
+                        $examen->postulaciones->load(['reglasPuntaje' => function ($query) {
+                            $query->whereHas('subprueba');
+                        }, 'reglasPuntaje.subprueba']);
+                    } catch (\Exception $e) {
+                        Log::warning('Error al cargar relaciones en paso 4', [
+                            'examen_id' => $examen->idExamen,
+                            'error' => $e->getMessage()
+                        ]);
+                        // Cargar sin relaciones anidadas si falla
+                        try {
+                            $examen->load(['postulaciones', 'subpruebas']);
+                        } catch (\Exception $e2) {
+                            $examen->setRelation('postulaciones', collect([]));
+                            $examen->setRelation('subpruebas', collect([]));
+                        }
+                    }
+                    return response()->json([
+                        'data' => [
+                            'idExamen' => $examen->idExamen,
+                            'postulaciones' => $examen->postulaciones->map(function ($postulacion) {
+                                return [
+                                    'idPostulacion' => $postulacion->idPostulacion,
+                                    'nombre' => $postulacion->nombre,
+                                    'descripcion' => $postulacion->descripcion,
+                                    'tipo_aprobacion' => $postulacion->tipo_aprobacion ?? '0',
+                                    'reglasPuntaje' => ($postulacion->reglasPuntaje ?? collect([]))->map(function ($regla) {
+                                        return [
+                                            'idRegla' => $regla->idRegla,
+                                            'idSubprueba' => $regla->idSubprueba,
+                                            'puntaje_correcto' => $regla->puntaje_correcto,
+                                            'puntaje_incorrecto' => $regla->puntaje_incorrecto,
+                                            'puntaje_en_blanco' => $regla->puntaje_en_blanco,
+                                            'puntaje_minimo_subprueba' => $regla->puntaje_minimo_subprueba,
+                                            'subprueba' => $regla->subprueba ? [
+                                                'idSubprueba' => $regla->subprueba->idSubprueba,
+                                                'nombre' => $regla->subprueba->nombre,
+                                            ] : null,
+                                        ];
+                                    }),
+                                ];
+                            }),
+                            'subpruebas' => $examen->subpruebas->map(function ($subprueba) {
+                                return [
+                                    'idSubprueba' => $subprueba->idSubprueba,
+                                    'nombre' => $subprueba->nombre,
+                                ];
+                            }),
+                        ],
+                    ]);
+
+                case 5:
+                    // Paso 5: Preguntas (usar el método ensamblar existente)
+                    return $this->ensamblar($examen);
+
+                case 6:
+                    // Paso 6: Configuración de fechas (solo fechas y usuarios asignados)
+                    try {
+                        // Formatear fechas de forma segura primero
+                        $fechaInicioVigencia = null;
+                        $fechaFinVigencia = null;
+                        try {
+                            $fechaInicioVigencia = $this->formatearFechaParaPaso($examen, 'fecha_inicio_vigencia');
+                        } catch (\Exception $e) {
+                            Log::warning('Error al formatear fecha_inicio_vigencia en paso 6', [
+                                'examen_id' => $examen->idExamen,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                        try {
+                            $fechaFinVigencia = $this->formatearFechaParaPaso($examen, 'fecha_fin_vigencia');
+                        } catch (\Exception $e) {
+                            Log::warning('Error al formatear fecha_fin_vigencia en paso 6', [
+                                'examen_id' => $examen->idExamen,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+
+                        // Cargar usuarios asignados de forma segura
+                        $usuariosAsignados = [];
+                        try {
+                            // Cargar la relación sin filtros primero para evitar problemas con whereHas
+                            $examen->load('usuariosAsignados');
+
+                            // Luego cargar los usuarios de forma individual para evitar errores
+                            foreach ($examen->usuariosAsignados as $examenUsuario) {
+                                try {
+                                    // Cargar el usuario si no está cargado
+                                    if (!$examenUsuario->relationLoaded('usuario')) {
+                                        $examenUsuario->load('usuario');
+                                    }
+
+                                    $usuario = $examenUsuario->usuario;
+                                    if ($usuario) {
+                                        $usuariosAsignados[] = [
+                                            'idUsuario' => $examenUsuario->idUsuario,
+                                            'nombre' => $usuario->nombre ?? null,
+                                            'apellidos' => $usuario->apellidos ?? null,
+                                        ];
+                                    }
+                                } catch (\Exception $e) {
+                                    // Si hay error al cargar un usuario específico, continuar con los demás
+                                    Log::warning('Error al cargar usuario en usuariosAsignados paso 6', [
+                                        'examen_id' => $examen->idExamen,
+                                        'examen_usuario_id' => $examenUsuario->idExamenUsuario ?? null,
+                                        'error' => $e->getMessage()
+                                    ]);
+                                    // Incluir el usuario asignado aunque no se pueda cargar el usuario completo
+                                    $usuariosAsignados[] = [
+                                        'idUsuario' => $examenUsuario->idUsuario ?? null,
+                                        'nombre' => null,
+                                        'apellidos' => null,
                                     ];
-                                }),
-                            ];
-                        }),
-                        'subpruebas' => $examen->subpruebas->map(function ($subprueba) {
-                            return [
-                                'idSubprueba' => $subprueba->idSubprueba,
-                                'nombre' => $subprueba->nombre,
-                            ];
-                        }),
-                    ],
-                ]);
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            Log::warning('Error al cargar usuariosAsignados en paso 6', [
+                                'examen_id' => $examen->idExamen,
+                                'error' => $e->getMessage()
+                            ]);
+                            // Continuar con usuariosAsignados vacío
+                            $usuariosAsignados = [];
+                        }
 
-            case 5:
-                // Paso 5: Preguntas (usar el método ensamblar existente)
-                return $this->ensamblar($examen);
+                        return response()->json([
+                            'data' => [
+                                'idExamen' => $examen->idExamen,
+                                'fecha_inicio_vigencia' => $fechaInicioVigencia,
+                                'fecha_fin_vigencia' => $fechaFinVigencia,
+                                'tipo_acceso' => $examen->tipo_acceso ?? 'publico',
+                                'usuariosAsignados' => $usuariosAsignados,
+                            ],
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::error('Error al construir respuesta en paso 6', [
+                            'examen_id' => $examen->idExamen,
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString()
+                        ]);
+                        throw $e; // Re-lanzar para que sea capturado por el catch general
+                    }
 
-            case 6:
-                // Paso 6: Configuración de fechas (solo fechas y usuarios asignados)
-                $examen->load(['usuariosAsignados.usuario']);
-                return response()->json([
-                    'data' => [
-                        'idExamen' => $examen->idExamen,
-                        'fecha_inicio_vigencia' => $examen->fecha_inicio_vigencia,
-                        'fecha_fin_vigencia' => $examen->fecha_fin_vigencia,
-                        'tipo_acceso' => $examen->tipo_acceso,
-                        'usuariosAsignados' => $examen->usuariosAsignados->map(function ($examenUsuario) {
-                            $usuario = $examenUsuario->usuario ?? null;
-                            return [
-                                'idUsuario' => $examenUsuario->idUsuario,
-                                'nombre' => $usuario ? $usuario->nombre : null,
-                                'apellidos' => $usuario ? $usuario->apellidos : null,
-                            ];
-                        }),
-                    ],
-                ]);
+                default:
+                    return response()->json([
+                        'message' => 'Paso inválido'
+                    ], 400);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error en getDatosPaso', [
+                'examen_id' => $id ?? null,
+                'paso' => $paso ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
 
-            default:
-                return response()->json([
-                    'message' => 'Paso inválido'
-                ], 400);
+            return response()->json([
+                'message' => 'Error al cargar los datos del paso',
+                'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
+            ], 500);
         }
     }
 

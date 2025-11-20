@@ -24,35 +24,44 @@ const Paso3Postulaciones: React.FC<Props> = ({
 }) => {
   const [postulaciones, setPostulaciones] = useState<Postulacion[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingPostulacion, setEditingPostulacion] = useState<Postulacion | null>(null);
   const [formData, setFormData] = useState({ nombre: '', descripcion: '' });
   const datosCargadosRef = React.useRef<string | null>(null);
 
+  // Verificar si el examen está finalizado (estado '1' = publicado o '2' = finalizado)
+  const examenFinalizado = (examen?.estado === '1' || examen?.estado === '2');
+
   const cargarPostulaciones = React.useCallback(async () => {
+    setLoadingData(true);
+    setError(null);
     try {
       const data = await examenesService.admin.getPostulaciones(examenId);
       setPostulaciones(data);
-    } catch {
-      // Error al cargar las postulaciones, se ignora silenciosamente
-      setError('Error al cargar las postulaciones');
+    } catch (err: unknown) {
+      const axiosError = err as AxiosErrorResponse;
+      const errorMessage = axiosError.response?.data?.message || 'Error al cargar las postulaciones';
+      setError(errorMessage);
+      console.error('Error al cargar postulaciones:', err);
+    } finally {
+      setLoadingData(false);
     }
   }, [examenId]);
 
   // Usar datosPaso si está disponible, sino cargar desde el API
   useEffect(() => {
+    // Verificar si datosPaso es del tipo correcto (DatosPaso3) y tiene postulaciones
+    const tienePostulaciones = datosPaso && 'postulaciones' in datosPaso && Array.isArray(datosPaso.postulaciones) && datosPaso.postulaciones.length > 0;
+
     // Crear una clave única para estos datos
-    const datosKey = datosPaso
-      ? `datos-${examenId}-${JSON.stringify(datosPaso.postulaciones?.map(p => p.idPostulacion) || [])}`
+    const datosKey = tienePostulaciones
+      ? `datos-${examenId}-${JSON.stringify(datosPaso.postulaciones.map(p => p.idPostulacion))}`
       : `api-${examenId}`;
 
-    // Evitar cargar datos múltiples veces para la misma clave
-    if (datosCargadosRef.current === datosKey) {
-      return;
-    }
-
-    if (datosPaso && datosPaso.postulaciones && Array.isArray(datosPaso.postulaciones)) {
+    // Si datosPaso tiene postulaciones válidas, usarlas
+    if (tienePostulaciones) {
       // Usar datos del paso cargado desde el wizard
       setPostulaciones(datosPaso.postulaciones.map((p: {
         idPostulacion: number;
@@ -66,14 +75,15 @@ const Paso3Postulaciones: React.FC<Props> = ({
         descripcion: p.descripcion,
         tipo_aprobacion: p.tipo_aprobacion
       })));
+      setLoadingData(false);
       datosCargadosRef.current = datosKey;
-    } else if (!datosPaso) {
-      // Si no hay datosPaso, cargar desde el API solo una vez
-      if (datosCargadosRef.current !== datosKey) {
-        cargarPostulaciones().then(() => {
-          datosCargadosRef.current = datosKey;
-        });
-      }
+    } else {
+      // Si no hay datosPaso válido o está vacío, siempre cargar desde el API
+      // Esto asegura que cuando se navega entre pasos, siempre se recarguen los datos
+      datosCargadosRef.current = null;
+      cargarPostulaciones().then(() => {
+        datosCargadosRef.current = datosKey;
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datosPaso, examenId]);
@@ -100,11 +110,9 @@ const Paso3Postulaciones: React.FC<Props> = ({
       return;
     }
 
-    // Verificar que el examen no esté publicado (estado '1')
-    // Se puede editar en borrador (estado '0') y finalizado (estado '2')
-    const estadoExamen = examen.estado ?? '0';
-    if (estadoExamen === '1') {
-      setError('No se pueden crear postulaciones cuando el examen está publicado. Debe finalizar el examen primero para poder editarlo.');
+    // Verificar que el examen no esté finalizado (estado '1' = publicado o '2' = finalizado)
+    if (!examen || examenFinalizado) {
+      setError('No se pueden crear postulaciones cuando el examen está finalizado.');
       return;
     }
 
@@ -121,6 +129,8 @@ const Paso3Postulaciones: React.FC<Props> = ({
 
       await examenesService.admin.createPostulacion(examenId, dataToSend);
 
+      // Resetear el ref para forzar recarga
+      datosCargadosRef.current = null;
       await cargarPostulaciones();
       setFormData({ nombre: '', descripcion: '' });
       setShowModal(false);
@@ -174,8 +184,8 @@ const Paso3Postulaciones: React.FC<Props> = ({
 
   const handleEditarPostulacion = (postulacion: Postulacion) => {
     // Verificar que el examen no esté publicado (estado '1')
-    if (!examen || examen.estado === '1') {
-      setError('No se pueden editar postulaciones cuando el examen está publicado. Debe finalizar el examen primero para poder editarlo.');
+    if (!examen || examenFinalizado) {
+      setError('No se pueden editar postulaciones cuando el examen está finalizado.');
       return;
     }
     setEditingPostulacion(postulacion);
@@ -190,8 +200,8 @@ const Paso3Postulaciones: React.FC<Props> = ({
     if (!editingPostulacion) return;
 
     // Verificar que el examen no esté publicado (estado '1')
-    if (!examen || examen.estado === '1') {
-      setError('No se pueden editar postulaciones cuando el examen está publicado. Debe finalizar el examen primero para poder editarlo.');
+    if (!examen || examenFinalizado) {
+      setError('No se pueden editar postulaciones cuando el examen está finalizado.');
       return;
     }
 
@@ -220,6 +230,8 @@ const Paso3Postulaciones: React.FC<Props> = ({
       }
 
       await examenesService.admin.updatePostulacion(editingPostulacion.idPostulacion, dataToSend);
+      // Resetear el ref para forzar recarga
+      datosCargadosRef.current = null;
       await cargarPostulaciones();
       setFormData({ nombre: '', descripcion: '' });
       setShowModal(false);
@@ -235,8 +247,8 @@ const Paso3Postulaciones: React.FC<Props> = ({
 
   const handleEliminar = async (id: number) => {
     // Verificar que el examen no esté publicado (estado '1')
-    if (!examen || examen.estado === '1') {
-      setError('No se pueden eliminar postulaciones cuando el examen está publicado. Debe finalizar el examen primero para poder editarlo.');
+    if (!examen || examenFinalizado) {
+      setError('No se pueden eliminar postulaciones cuando el examen está finalizado.');
       return;
     }
 
@@ -246,6 +258,8 @@ const Paso3Postulaciones: React.FC<Props> = ({
 
     try {
       await examenesService.admin.deletePostulacion(id);
+      // Resetear el ref para forzar recarga
+      datosCargadosRef.current = null;
       await cargarPostulaciones();
     } catch (err: unknown) {
       const axiosError = err as AxiosErrorResponse;
@@ -266,7 +280,7 @@ const Paso3Postulaciones: React.FC<Props> = ({
         </p>
       </div>
 
-      {error && (
+      {error && !showModal && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-red-800 text-sm">{error}</p>
         </div>
@@ -276,7 +290,7 @@ const Paso3Postulaciones: React.FC<Props> = ({
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-medium text-gray-900">Postulaciones Creadas</h3>
-          {!soloLectura && examen && examen.estado !== '1' && (
+          {!soloLectura && examen && !examenFinalizado && (
             <button
               onClick={() => {
                 setFormData({ nombre: '', descripcion: '' });
@@ -290,7 +304,11 @@ const Paso3Postulaciones: React.FC<Props> = ({
           )}
         </div>
 
-        {postulaciones.length === 0 ? (
+        {loadingData ? (
+          <div className="p-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 text-center">
+            <p className="text-gray-600">Cargando datos...</p>
+          </div>
+        ) : postulaciones.length === 0 ? (
           <div className="p-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 text-center">
             <p className="text-gray-600 mb-2">⚠ Aún no hay postulaciones creadas.</p>
             <p className="text-sm text-gray-500">Debe crear al menos 1 postulación para continuar.</p>
@@ -311,7 +329,7 @@ const Paso3Postulaciones: React.FC<Props> = ({
                     Reglas configuradas: 0 (se configurarán en el Paso 4)
                   </p>
                 </div>
-                {!soloLectura && examen && examen.estado !== '1' && (
+                {!soloLectura && examen && !examenFinalizado && (
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleEditarPostulacion(postulacion)}
@@ -334,7 +352,7 @@ const Paso3Postulaciones: React.FC<Props> = ({
           </div>
         )}
 
-        {puedeContinuar && (
+        {!loadingData && puedeContinuar && (
           <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
             <p className="text-sm text-green-800">
               ✓ Requisito cumplido: Al menos 1 postulación creada
@@ -359,6 +377,12 @@ const Paso3Postulaciones: React.FC<Props> = ({
             <h3 className="text-lg font-semibold mb-4">
               {editingPostulacion ? 'Editar Postulación' : 'Crear Postulación'}
             </h3>
+
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-800 text-sm">{error}</p>
+              </div>
+            )}
 
             <form onSubmit={(e) => {
               e.preventDefault();

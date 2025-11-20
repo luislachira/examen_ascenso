@@ -35,6 +35,7 @@ const Paso5Ensamblador: React.FC<Props> = ({
         examenId={examenId}
         soloLectura={soloLectura}
         onCerrar={onVolver}
+        mostrarComoModal={false}
         onPreguntasActualizadas={async () => {
           // Verificar si todas las subpruebas tienen preguntas
           // Esto se puede hacer llamando al estado del wizard

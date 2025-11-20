@@ -69,91 +69,128 @@ Route::prefix('v1')->group(function () {
 
         // *** CRÍTICO: Endpoint para obtener el usuario autenticado ***
         Route::get('/user', function (Request $request) {
-            $user = $request->user();
+            try {
+                $user = $request->user();
 
-            return response()->json([
-                'idUsuario' => $user->idUsuario,
-                'nombre' => $user->nombre,
-                'apellidos' => $user->apellidos,
-                'correo' => $user->correo ?? $user->email,
-                'rol' => (string) $user->rol, // Asegurar que sea string
-                'nombre_escala' => $user->nombre_escala,
-            ]);
+                if (!$user) {
+                    return response()->json([
+                        'message' => 'Usuario no autenticado'
+                    ], 401);
+                }
+
+                return response()->json([
+                    'idUsuario' => $user->idUsuario,
+                    'nombre' => $user->nombre,
+                    'apellidos' => $user->apellidos,
+                    'correo' => $user->correo ?? $user->email,
+                    'rol' => (string) $user->rol, // Asegurar que sea string
+                ]);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Error en endpoint /user', [
+                    'message' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+
+                return response()->json([
+                    'message' => 'Error al obtener información del usuario',
+                    'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
+                ], 500);
+            }
         })->name('api.v1.user');
 
         // Endpoint para verificar el tiempo restante de inactividad
         Route::get('/user/activity-status', function (Request $request) {
-            $user = $request->user();
-            $token = $user->token();
+            try {
+                $user = $request->user();
 
-            if (!$token) {
+                if (!$user) {
+                    return response()->json([
+                        'message' => 'Usuario no autenticado'
+                    ], 401);
+                }
+
+                $token = $user->token();
+
+                if (!$token) {
+                    return response()->json([
+                        'message' => 'Token no encontrado'
+                    ], 404);
+                }
+
+                $tokenId = $token->id;
+                // Usar explícitamente la conexión MySQL
+                $tokenRecord = \Illuminate\Support\Facades\DB::connection('mysql')->table('oauth_access_tokens')
+                    ->where('id', $tokenId)
+                    ->where('revoked', false)
+                    ->first();
+
+                if (!$tokenRecord) {
+                    return response()->json([
+                        'message' => 'Token no encontrado en la base de datos o ha sido revocado'
+                    ], 404);
+                }
+
+                $lastActivity = $tokenRecord->updated_at
+                    ? \Carbon\Carbon::parse($tokenRecord->updated_at)
+                    : \Carbon\Carbon::parse($tokenRecord->created_at);
+
+                $now = \Carbon\Carbon::now();
+
+                // Asegurar que ambas fechas estén en la misma zona horaria
+                $lastActivity->setTimezone($now->timezone);
+
+                // Calcular la diferencia en segundos
+                // Si lastActivity es en el pasado, el tiempo transcurrido es positivo
+                // Si lastActivity es en el futuro (error), asumimos 0
+                if ($lastActivity->gt($now)) {
+                    // Error: lastActivity está en el futuro, asumimos que no ha pasado tiempo
+                    $secondsSinceLastActivity = 0;
+                } else {
+                    // lastActivity está en el pasado, calcular diferencia correctamente
+                    $secondsSinceLastActivity = $now->timestamp - $lastActivity->timestamp;
+                }
+
+                // Asegurar que no sea negativo
+                $secondsSinceLastActivity = max(0, $secondsSinceLastActivity);
+                $minutesSinceLastActivity = $secondsSinceLastActivity / 60;
+
+                // Usar la misma constante que el middleware para mantener consistencia
+                $inactivityTimeout = \App\Http\Middleware\CheckUserActivity::INACTIVITY_TIMEOUT_MINUTES;
+                $inactivityTimeoutSeconds = $inactivityTimeout * 60;
+
+                // Calcular segundos restantes
+                $secondsRemaining = max(0, $inactivityTimeoutSeconds - $secondsSinceLastActivity);
+                $minutesRemaining = $secondsRemaining / 60;
+
+                // Log para debugging
+                \Illuminate\Support\Facades\Log::debug('Activity Status Check', [
+                    'last_activity' => $lastActivity->toDateTimeString(),
+                    'now' => $now->toDateTimeString(),
+                    'last_activity_timestamp' => $lastActivity->timestamp,
+                    'now_timestamp' => $now->timestamp,
+                    'seconds_since' => $secondsSinceLastActivity,
+                    'seconds_remaining' => $secondsRemaining,
+                    'timeout_seconds' => $inactivityTimeoutSeconds,
+                    'is_last_activity_future' => $lastActivity->gt($now),
+                ]);
+
                 return response()->json([
-                    'message' => 'Token no encontrado'
-                ], 404);
-            }
+                    'minutes_remaining' => $minutesRemaining,
+                    'seconds_remaining' => $secondsRemaining,
+                    'last_activity' => $lastActivity->toIso8601String(),
+                    'inactivity_timeout' => $inactivityTimeout,
+                ]);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Error en activity-status endpoint', [
+                    'message' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
 
-            $tokenId = $token->id;
-            $tokenRecord = \Illuminate\Support\Facades\DB::table('oauth_access_tokens')
-                ->where('id', $tokenId)
-                ->where('revoked', false)
-                ->first();
-
-            if (!$tokenRecord) {
                 return response()->json([
-                    'message' => 'Token no encontrado en la base de datos o ha sido revocado'
-                ], 404);
+                    'message' => 'Error al verificar el estado de actividad',
+                    'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
+                ], 500);
             }
-
-            $lastActivity = $tokenRecord->updated_at
-                ? \Carbon\Carbon::parse($tokenRecord->updated_at)
-                : \Carbon\Carbon::parse($tokenRecord->created_at);
-
-            $now = \Carbon\Carbon::now();
-
-            // Asegurar que ambas fechas estén en la misma zona horaria
-            $lastActivity->setTimezone($now->timezone);
-
-            // Calcular la diferencia en segundos
-            // Si lastActivity es en el pasado, el tiempo transcurrido es positivo
-            // Si lastActivity es en el futuro (error), asumimos 0
-            if ($lastActivity->gt($now)) {
-                // Error: lastActivity está en el futuro, asumimos que no ha pasado tiempo
-                $secondsSinceLastActivity = 0;
-            } else {
-                // lastActivity está en el pasado, calcular diferencia correctamente
-                $secondsSinceLastActivity = $now->timestamp - $lastActivity->timestamp;
-            }
-
-            // Asegurar que no sea negativo
-            $secondsSinceLastActivity = max(0, $secondsSinceLastActivity);
-            $minutesSinceLastActivity = $secondsSinceLastActivity / 60;
-
-            // Usar la misma constante que el middleware para mantener consistencia
-            $inactivityTimeout = \App\Http\Middleware\CheckUserActivity::INACTIVITY_TIMEOUT_MINUTES;
-            $inactivityTimeoutSeconds = $inactivityTimeout * 60;
-
-            // Calcular segundos restantes
-            $secondsRemaining = max(0, $inactivityTimeoutSeconds - $secondsSinceLastActivity);
-            $minutesRemaining = $secondsRemaining / 60;
-
-            // Log para debugging
-            \Illuminate\Support\Facades\Log::debug('Activity Status Check', [
-                'last_activity' => $lastActivity->toDateTimeString(),
-                'now' => $now->toDateTimeString(),
-                'last_activity_timestamp' => $lastActivity->timestamp,
-                'now_timestamp' => $now->timestamp,
-                'seconds_since' => $secondsSinceLastActivity,
-                'seconds_remaining' => $secondsRemaining,
-                'timeout_seconds' => $inactivityTimeoutSeconds,
-                'is_last_activity_future' => $lastActivity->gt($now),
-            ]);
-
-            return response()->json([
-                'minutes_remaining' => $minutesRemaining,
-                'seconds_remaining' => $secondsRemaining,
-                'last_activity' => $lastActivity->toIso8601String(),
-                'inactivity_timeout' => $inactivityTimeout,
-            ]);
         })->name('api.v1.user.activity-status');
 
         // Ruta común para cerrar sesión

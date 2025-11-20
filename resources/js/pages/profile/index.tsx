@@ -151,7 +151,7 @@ const Perfil: React.FC = () => {
     };
 
     return (
-        <div className="perfil-container p-6 max-w-4xl mx-auto">
+        <div className="perfil-container w-full p-6" style={{ maxWidth: '100%', overflowX: 'hidden', boxSizing: 'border-box' }}>
             <div className="mb-6">
                 <h1 className="text-3xl font-bold text-gray-900 flex items-center">
                     <FaUserCircle className="mr-3 text-blue-600" />
@@ -160,47 +160,47 @@ const Perfil: React.FC = () => {
                 <p className="text-gray-600 mt-2">Gestiona tu información personal y configuración de cuenta</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-6xl mx-auto w-full" style={{ maxWidth: '100%', boxSizing: 'border-box' }}>
                 {/* Información del usuario - Card lateral */}
-                <Card className="lg:col-span-1">
+                <Card className="lg:col-span-1 min-w-0">
                     <CardHeader className="text-center">
                         <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                             <FaUserCircle className="text-4xl text-blue-600" />
                         </div>
-                        <CardTitle className="text-xl">{user?.nombre} {user?.apellidos}</CardTitle>
+                        <CardTitle className="text-xl break-words">{user?.nombre} {user?.apellidos}</CardTitle>
                         <p className="text-sm text-gray-600">
                             {user?.rol === '0' ? 'Administrador' : 'Docente'}
                         </p>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-3">
-                            <div className="flex items-center text-sm text-gray-600">
-                                <FaEnvelope className="mr-2" />
-                                {user?.correo}
+                            <div className="flex items-center text-sm text-gray-600 break-words">
+                                <FaEnvelope className="mr-2 flex-shrink-0" />
+                                <span className="break-all">{user?.correo}</span>
                             </div>
                             <div className="flex items-center text-sm text-gray-600">
-                                <FaUser className="mr-2" />
-                                ID: {user?.idUsuario}
+                                <FaUser className="mr-2 flex-shrink-0" />
+                                <span>ID: {user?.idUsuario}</span>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
 
                 {/* Formulario de edición - Card principal */}
-                <Card className="lg:col-span-2">
-                    <CardHeader className="flex flex-row items-center justify-between">
+                <Card className="lg:col-span-2 min-w-0">
+                    <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <CardTitle className="text-xl">Información Personal</CardTitle>
                         {!isEditing ? (
-                            <Button onClick={handleEdit} className="bg-blue-600 hover:bg-blue-700">
+                            <Button onClick={handleEdit} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
                                 <FaUser className="mr-2" />
                                 Editar Perfil
                             </Button>
                         ) : (
-                            <div className="flex space-x-2">
+                            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
                                 <Button
                                     onClick={handleSave}
                                     disabled={loading}
-                                    className="bg-green-600 hover:bg-green-700"
+                                    className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
                                 >
                                     <FaSave className="mr-2" />
                                     {loading ? 'Guardando...' : 'Guardar'}
@@ -209,6 +209,7 @@ const Perfil: React.FC = () => {
                                     variant="outline"
                                     onClick={handleCancel}
                                     disabled={loading}
+                                    className="w-full sm:w-auto"
                                 >
                                     <FaTimes className="mr-2" />
                                     Cancelar
@@ -216,7 +217,7 @@ const Perfil: React.FC = () => {
                             </div>
                         )}
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="overflow-x-auto">
                         {message && (
                             <Alert className={`mb-4 ${message.type === 'success' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
                                 <AlertDescription className={message.type === 'success' ? 'text-green-800' : 'text-red-800'}>
@@ -225,9 +226,9 @@ const Perfil: React.FC = () => {
                             </Alert>
                         )}
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
                             {/* Datos básicos */}
-                            <div className="space-y-4">
+                            <div className="space-y-4 min-w-0">
                                 <div>
                                     <Label htmlFor="nombre">Nombre</Label>
                                     <Input
@@ -266,7 +267,7 @@ const Perfil: React.FC = () => {
 
                             {/* Cambio de contraseña */}
                             {isEditing && (
-                                <div className="space-y-4">
+                                <div className="space-y-4 min-w-0">
                                     <div>
                                         <Label htmlFor="password">Nueva Contraseña (opcional)</Label>
                                         <Input
@@ -290,15 +291,15 @@ const Perfil: React.FC = () => {
                                     </div>
 
                                     <div className="flex items-center text-sm text-gray-600 bg-blue-50 p-3 rounded-md">
-                                        <FaKey className="mr-2 text-blue-600" />
-                                        <span>Si no deseas cambiar tu contraseña, deja estos campos vacíos.</span>
+                                        <FaKey className="mr-2 text-blue-600 flex-shrink-0" />
+                                        <span className="break-words">Si no deseas cambiar tu contraseña, deja estos campos vacíos.</span>
                                     </div>
                                 </div>
                             )}
 
                             {/* Información de solo lectura cuando no está editando */}
                             {!isEditing && (
-                                <div className="space-y-4">
+                                <div className="space-y-4 min-w-0">
                                     <div className="bg-gray-50 p-4 rounded-lg">
                                         <h4 className="font-medium text-gray-900 mb-3">Información de Cuenta</h4>
                                         <div className="space-y-2 text-sm text-gray-600">

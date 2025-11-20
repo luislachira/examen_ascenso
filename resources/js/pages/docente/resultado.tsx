@@ -35,6 +35,13 @@ interface ResultadoSubprueba {
   };
 }
 
+interface Postulacion {
+  idPostulacion: number;
+  nombre: string;
+  descripcion?: string | null;
+  tipo_aprobacion?: '0' | '1';
+}
+
 interface Intento {
   idIntento: number;
   puntaje: number | string | null;
@@ -42,6 +49,7 @@ interface Intento {
   examen: {
     titulo: string;
   } | null;
+  postulacion?: Postulacion | null;
   respuestas: Respuesta[];
   resultados_subpruebas?: ResultadoSubprueba[];
 }
@@ -130,6 +138,15 @@ const ResultadoIntento: React.FC = () => {
           </button>
           <h1 className="text-3xl font-bold text-gray-900">Resultado del Examen</h1>
           <p className="text-gray-600 mt-2">{intento.examen?.titulo || 'Examen no disponible'}</p>
+          {intento.postulacion && (
+            <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-gray-600">Postulación seleccionada:</p>
+              <p className="text-base font-semibold text-gray-900">{intento.postulacion.nombre}</p>
+              {intento.postulacion.descripcion && (
+                <p className="text-sm text-gray-600 mt-1">{intento.postulacion.descripcion}</p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* RF-D.3.1: Muestra de Resultado Inmediato */}

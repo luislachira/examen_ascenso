@@ -34,6 +34,13 @@ interface ResultadoSubprueba {
   };
 }
 
+interface Postulacion {
+  idPostulacion: number;
+  nombre: string;
+  descripcion?: string | null;
+  tipo_aprobacion?: '0' | '1';
+}
+
 interface Intento {
   idIntento: number;
   idExamen: number;
@@ -52,6 +59,7 @@ interface Intento {
     idExamen: number;
     titulo: string;
   };
+  postulacion?: Postulacion | null;
   respuestas?: RespuestaIntento[];
   resultados_subpruebas?: ResultadoSubprueba[];
 }
@@ -437,6 +445,17 @@ const ResultadosAdmin: React.FC = () => {
                   ✕
                 </button>
               </div>
+
+              {/* Información de Postulación */}
+              {mostrarDetalle.postulacion && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                  <p className="text-sm text-gray-600 mb-1">Postulación seleccionada:</p>
+                  <p className="text-lg font-semibold text-gray-900">{mostrarDetalle.postulacion.nombre}</p>
+                  {mostrarDetalle.postulacion.descripcion && (
+                    <p className="text-sm text-gray-600 mt-2">{mostrarDetalle.postulacion.descripcion}</p>
+                  )}
+                </div>
+              )}
 
               {/* Card de Resultado General */}
               <div className={`bg-white rounded-lg shadow-sm p-6 mb-6 border-2 ${

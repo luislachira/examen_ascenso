@@ -461,10 +461,21 @@ export const useTomaExamen = (): UseTomaExamenResult => {
     try {
       const result = await examenesService.docente.cargarIntento(id);
 
+      // Si el examen ya fue finalizado, retornar false sin establecer error
+      // El componente se encargará de redirigir
+      if (result && 'ya_finalizado' in result && result.ya_finalizado) {
+        setLoading(false);
+        return false;
+      }
+
+      if (!result || !result.examen) {
+        setLoading(false);
+        return false;
+      }
 
       setExamenActivo(result.examen);
-      setResultadoId(result.resultado_id);
-      setHoraFin(result.hora_fin); // RF-D.2.2: Guardar hora_fin del servidor
+      setResultadoId(result.resultado_id ?? null);
+      setHoraFin(result.hora_fin ?? null); // RF-D.2.2: Guardar hora_fin del servidor
       // Calcular tiempo restante inicial
       if (result.hora_fin) {
         const ahora = new Date();
@@ -511,6 +522,15 @@ export const useTomaExamen = (): UseTomaExamenResult => {
 
       return true;
     } catch (err: unknown) {
+      // Si el error es porque ya finalizó el examen, retornar false sin establecer error
+      // El componente se encargará de redirigir
+      if (err && typeof err === 'object' && 'response' in err &&
+          err.response && typeof err.response === 'object' && 'data' in err.response &&
+          err.response.data && typeof err.response.data === 'object' && 'ya_finalizado' in err.response.data) {
+        setLoading(false);
+        return false;
+      }
+
       handleError(err);
       return false;
     } finally {

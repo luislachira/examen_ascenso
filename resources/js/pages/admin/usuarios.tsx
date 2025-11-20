@@ -39,6 +39,15 @@ const Usuarios: React.FC = () => {
         usuarios,
         loading,
         error,
+        pagination,
+        currentPage,
+        searchTerm,
+        roleFilter,
+        estadoFilter,
+        setSearchTerm,
+        setRoleFilter,
+        setEstadoFilter,
+        fetchUsuarios,
         aprobarUsuario,
         suspenderUsuario,
         eliminarUsuario,
@@ -46,8 +55,6 @@ const Usuarios: React.FC = () => {
         actualizarUsuario
     } = useUsuarios();
 
-    const [searchTerm, setSearchTerm] = useState('');
-    const [roleFilter, setRoleFilter] = useState('todos');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
@@ -65,20 +72,8 @@ const Usuarios: React.FC = () => {
 
     const [userToDelete, setUserToDelete] = useState<number | null>(null);
 
-    // Filtrar usuarios (ahora usa el estado 'usuarios' del hook)
-    const filteredUsuarios = usuarios.filter(usuario => {
-        // Normalizamos el término de búsqueda una sola vez
-        const normalizedSearchTerm = searchTerm.toLowerCase();
-
-        // Unimos nombre y apellidos para buscar
-        const fullName = `${usuario.nombre} ${usuario.apellidos}`.toLowerCase();
-
-        // Comprobamos si el nombre completo O el correo incluyen el término
-        const matchesSearch = fullName.includes(normalizedSearchTerm) ||
-                              usuario.correo.toLowerCase().includes(normalizedSearchTerm);
-        const matchesRole = roleFilter === 'todos' || usuario.rol === roleFilter;
-        return matchesSearch && matchesRole;
-    });
+    // Usar usuarios directamente del hook (ya filtrados por el backend)
+    const filteredUsuarios = usuarios;
 
     // Obtener badge de estado
     const getEstadoBadge = (estado: string) => {
@@ -105,6 +100,23 @@ const Usuarios: React.FC = () => {
             ...prev,
             [field]: value
         }));
+    };
+
+    // Manejar búsqueda
+    const handleSearchChange = (value: string) => {
+        setSearchTerm(value);
+        fetchUsuarios(1, value, roleFilter, estadoFilter);
+    };
+
+    // Manejar cambio de filtro de rol
+    const handleRoleFilterChange = (value: string) => {
+        setRoleFilter(value);
+        fetchUsuarios(1, searchTerm, value, estadoFilter);
+    };
+
+    // Manejar cambio de página
+    const handlePageChange = (page: number) => {
+        fetchUsuarios(page, searchTerm, roleFilter, estadoFilter);
     };
 
     // --- Manejadores de acciones (UI + Hook) ---
@@ -333,12 +345,12 @@ const Usuarios: React.FC = () => {
                                     type="text"
                                     placeholder="Buscar usuario..."
                                     value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onChange={(e) => handleSearchChange(e.target.value)}
                                     className="search-input"
                                 />
                             </div>
 
-                            <Select value={roleFilter} onValueChange={setRoleFilter}>
+                            <Select value={roleFilter} onValueChange={handleRoleFilterChange}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Todos los roles" />
                                 </SelectTrigger>
@@ -604,12 +616,42 @@ const Usuarios: React.FC = () => {
                             ))}
                         </div>
 
-                        {filteredUsuarios.length === 0 && (
+                        {filteredUsuarios.length === 0 && !loading && (
                             <div className="no-users">
                                 <p>No se encontraron usuarios que coincidan con los criterios de búsqueda.</p>
                             </div>
                         )}
                     </div>
+
+                    {/* Paginación */}
+                    {pagination && pagination.total > 0 && (
+                        <div className="px-3 sm:px-4 xl:px-6 py-3 sm:py-4 border-t border-gray-200 bg-gray-50">
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0">
+                                <div className="text-xs sm:text-sm text-gray-700 text-center sm:text-left">
+                                    Mostrando {pagination.from} a {pagination.to} de {pagination.total} resultados
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <button
+                                        onClick={() => handlePageChange(pagination.current_page - 1)}
+                                        disabled={pagination.current_page === 1 || loading}
+                                        className="px-2 sm:px-3 py-1 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        ← Anterior
+                                    </button>
+                                    <span className="text-xs sm:text-sm text-gray-700">
+                                        Página {pagination.current_page} de {pagination.last_page}
+                                    </span>
+                                    <button
+                                        onClick={() => handlePageChange(pagination.current_page + 1)}
+                                        disabled={pagination.current_page === pagination.last_page || loading}
+                                        className="px-2 sm:px-3 py-1 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Siguiente →
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </Card>
 
                 {/* Modal de Edición */}

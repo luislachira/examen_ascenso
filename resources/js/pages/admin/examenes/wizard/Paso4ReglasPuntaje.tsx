@@ -26,6 +26,7 @@ const Paso4ReglasPuntaje: React.FC<Props> = ({
   const [postulaciones, setPostulaciones] = useState<Postulacion[]>([]);
   const [reglas, setReglas] = useState<ReglaPuntaje[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingRegla, setEditingRegla] = useState<ReglaPuntaje | null>(null);
@@ -37,7 +38,12 @@ const Paso4ReglasPuntaje: React.FC<Props> = ({
   });
   const datosCargadosRef = React.useRef<string | null>(null);
 
+  // Verificar si el examen está finalizado (estado '1' = publicado o '2' = finalizado)
+  const examenFinalizado = (examen?.estado === '1' || examen?.estado === '2');
+
   const cargarDatos = React.useCallback(async () => {
+    setLoadingData(true);
+    setError(null);
     try {
       const [subpruebasData, postulacionesData] = await Promise.all([
         examenesService.admin.getSubpruebas(examenId),
@@ -52,13 +58,20 @@ const Paso4ReglasPuntaje: React.FC<Props> = ({
         try {
           const reglasPost = await examenesService.admin.getReglasPuntaje(post.idPostulacion);
           todasReglas.push(...reglasPost);
-        } catch {
+        } catch (err) {
           // Ignorar errores al cargar reglas de una postulación específica
+          // pero registrar para debugging
+          console.warn(`Error al cargar reglas para postulación ${post.idPostulacion}:`, err);
         }
       }
       setReglas(todasReglas);
-    } catch {
-      setError('Error al cargar los datos');
+    } catch (err: unknown) {
+      const axiosError = err as AxiosErrorResponse;
+      const errorMessage = axiosError.response?.data?.message || 'Error al cargar los datos';
+      setError(errorMessage);
+      console.error('Error al cargar datos del paso 4:', err);
+    } finally {
+      setLoadingData(false);
     }
   }, [examenId]);
 
@@ -78,6 +91,7 @@ const Paso4ReglasPuntaje: React.FC<Props> = ({
     }
 
     if (datosPaso && Array.isArray(datosPaso.subpruebas) && Array.isArray(datosPaso.postulaciones)) {
+      setLoadingData(true);
       // Usar datos del paso cargado desde el wizard
       setSubpruebas(datosPaso.subpruebas.map((s: { idSubprueba: number; nombre: string }) => ({
         idSubprueba: s.idSubprueba,
@@ -134,9 +148,18 @@ const Paso4ReglasPuntaje: React.FC<Props> = ({
         }
       });
       setReglas(todasReglas);
-      datosCargadosRef.current = datosKey;
-    } else if (!datosPaso) {
-      // Si no hay datosPaso, cargar desde el API solo una vez
+
+      // Si no hay reglas en datosPaso, cargar desde el API como respaldo
+      if (todasReglas.length === 0 && postulacionesMapeadas.length > 0) {
+        cargarDatos().then(() => {
+          datosCargadosRef.current = datosKey;
+        });
+      } else {
+        setLoadingData(false);
+        datosCargadosRef.current = datosKey;
+      }
+    } else {
+      // Si no hay datosPaso, cargar desde el API
       if (datosCargadosRef.current !== datosKey) {
         cargarDatos().then(() => {
           datosCargadosRef.current = datosKey;
@@ -195,9 +218,9 @@ const Paso4ReglasPuntaje: React.FC<Props> = ({
   };
 
   const handleEditarRegla = (regla: ReglaPuntaje) => {
-    // Verificar que el examen no esté publicado (estado '1')
-    if (!examen || examen.estado === '1') {
-      setError('No se pueden editar reglas de puntaje cuando el examen está publicado. Debe finalizar el examen primero para poder editarlo.');
+    // Verificar que el examen no esté finalizado (estado '1' = publicado o '2' = finalizado)
+    if (!examen || examenFinalizado) {
+      setError('No se pueden editar reglas de puntaje cuando el examen está finalizado.');
       return;
     }
     setEditingRegla(regla);
@@ -215,9 +238,9 @@ const Paso4ReglasPuntaje: React.FC<Props> = ({
 
     if (!editingRegla) return;
 
-    // Verificar que el examen no esté publicado (estado '1')
-    if (!examen || examen.estado === '1') {
-      setError('No se pueden editar reglas de puntaje cuando el examen está publicado. Debe finalizar el examen primero para poder editarlo.');
+    // Verificar que el examen no esté finalizado (estado '1' = publicado o '2' = finalizado)
+    if (!examen || examenFinalizado) {
+      setError('No se pueden editar reglas de puntaje cuando el examen está finalizado.');
       return;
     }
 
@@ -250,9 +273,9 @@ const Paso4ReglasPuntaje: React.FC<Props> = ({
   };
 
   const handleEliminar = async (id: number) => {
-    // Verificar que el examen no esté publicado (estado '1')
-    if (!examen || examen.estado === '1') {
-      setError('No se pueden eliminar reglas de puntaje cuando el examen está publicado. Debe finalizar el examen primero para poder editarlo.');
+    // Verificar que el examen no esté finalizado (estado '1' = publicado o '2' = finalizado)
+    if (!examen || examenFinalizado) {
+      setError('No se pueden eliminar reglas de puntaje cuando el examen está finalizado.');
       return;
     }
 
@@ -287,14 +310,14 @@ const Paso4ReglasPuntaje: React.FC<Props> = ({
         </p>
       </div>
 
-      {error && (
+      {error && !showModal && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-red-800 text-sm">{error}</p>
         </div>
       )}
 
-      {/* Validación pendiente */}
-      {postulacionesSinReglas.length > 0 && (
+      {/* Validación pendiente - Solo mostrar cuando los datos estén cargados */}
+      {!loadingData && postulacionesSinReglas.length > 0 && (
         <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="text-yellow-800 text-sm font-medium mb-2">
             ⚠ VALIDACIÓN PENDIENTE:
@@ -313,7 +336,7 @@ const Paso4ReglasPuntaje: React.FC<Props> = ({
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-medium text-gray-900">Matriz de Reglas de Puntaje</h3>
-          {!soloLectura && examen && examen.estado !== '1' && (
+          {!soloLectura && examen && !examenFinalizado && (
             <button
               onClick={() => {
                 setFormData({ idPostulacion: '', idSubprueba: '', puntaje_correcto: '', puntaje_minimo_subprueba: '' });
@@ -327,7 +350,11 @@ const Paso4ReglasPuntaje: React.FC<Props> = ({
           )}
         </div>
 
-        {postulaciones.length === 0 ? (
+        {loadingData ? (
+          <div className="p-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 text-center">
+            <p className="text-gray-600">Cargando datos...</p>
+          </div>
+        ) : postulaciones.length === 0 ? (
           <div className="p-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 text-center">
             <p className="text-gray-600">Debe crear postulaciones en el Paso 3 antes de configurar reglas.</p>
           </div>
@@ -367,9 +394,16 @@ const Paso4ReglasPuntaje: React.FC<Props> = ({
                           >
                             <div className="flex-1">
                               {subpruebaNoExiste && (
-                                <div className="mb-2 p-2 bg-red-100 border border-red-300 rounded text-xs text-red-800">
-                                  ⚠️ ADVERTENCIA: La subprueba asociada a esta regla ya no existe.
-                                  Esta regla debe ser eliminada y recreada con una subprueba válida.
+                                <div className={`mb-2 p-2 border rounded text-xs ${
+                                  examenFinalizado
+                                    ? 'bg-yellow-50 border-yellow-300 text-yellow-800'
+                                    : 'bg-red-100 border-red-300 text-red-800'
+                                }`}>
+                                  ⚠️ {examenFinalizado ? 'INFORMACIÓN' : 'ADVERTENCIA'}: La subprueba asociada a esta regla ya no existe.
+                                  {examenFinalizado
+                                    ? ' Esta regla hace referencia a una subprueba que fue eliminada. El examen ya está finalizado, por lo que no se pueden realizar cambios.'
+                                    : ' Esta regla debe ser eliminada y recreada con una subprueba válida.'
+                                  }
                                 </div>
                               )}
                               <p className="font-medium text-sm">
@@ -384,7 +418,7 @@ const Paso4ReglasPuntaje: React.FC<Props> = ({
                                 </p>
                               )}
                             </div>
-                            {!soloLectura && examen && examen.estado !== '1' && (
+                            {!soloLectura && examen && !examenFinalizado && (
                               <div className="flex gap-1">
                                 <button
                                   onClick={() => handleEditarRegla(regla)}
@@ -431,6 +465,12 @@ const Paso4ReglasPuntaje: React.FC<Props> = ({
             <h3 className="text-lg font-semibold mb-4">
               {editingRegla ? 'Editar Regla de Puntaje' : 'Crear Regla de Puntaje'}
             </h3>
+
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-800 text-sm">{error}</p>
+              </div>
+            )}
 
             <form onSubmit={editingRegla ? handleActualizarRegla : handleCrearRegla}>
               <div className="space-y-4">

@@ -188,6 +188,37 @@ const ConfiguracionAdmin: React.FC = () => {
               </span>
             </div>
           </div>
+          
+          {/* Información del Desarrollador */}
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Desarrollador del Sistema</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600">Nombre:</span>
+                <span className="ml-2 font-medium text-gray-900">Luis Lachira Nima</span>
+              </div>
+              <div>
+                <span className="text-gray-600">Correo:</span>
+                <a 
+                  href="mailto:luislachiraofi1@gmail.com" 
+                  className="ml-2 font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                >
+                  luislachiraofi1@gmail.com
+                </a>
+              </div>
+              <div>
+                <span className="text-gray-600">GitHub:</span>
+                <a 
+                  href="https://github.com/luislachira" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="ml-2 font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                >
+                  luislachira
+                </a>
+              </div>
+            </div>
+          </div>
         </Card>
 
         {/* Botón Guardar */}

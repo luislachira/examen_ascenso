@@ -24,12 +24,12 @@ class PostulacionController extends Controller
     }
 
     /**
-     * Verificar si el examen está finalizado (estado = '2')
+     * Verificar si el examen está finalizado (estado = '1' publicado o '2' finalizado)
      * Si está finalizado, lanzar una excepción
      */
     private function verificarExamenNoFinalizado(Examen $examen): void
     {
-        if ($examen->estado === '2') {
+        if ($examen->estado === '1' || $examen->estado === '2') {
             throw new \Exception(
                 'No se puede modificar un examen finalizado. Solo se puede ver su configuración, duplicarlo o eliminarlo.'
             );
@@ -41,11 +41,24 @@ class PostulacionController extends Controller
      */
     public function index(Examen $examen)
     {
-        $postulaciones = Postulacion::where('idExamen', $examen->idExamen)
-            ->orderBy('nombre')
-            ->get();
+        try {
+            $postulaciones = Postulacion::where('idExamen', $examen->idExamen)
+                ->orderBy('nombre')
+                ->get();
 
-        return response()->json($postulaciones);
+            return response()->json($postulaciones);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error al obtener postulaciones', [
+                'examen_id' => $examen->idExamen ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'message' => 'Error al cargar las postulaciones',
+                'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
+            ], 500);
+        }
     }
 
     /**
@@ -96,31 +109,17 @@ class PostulacionController extends Controller
             ], 422);
         }
 
-        // Verificar que el examen esté en borrador
-        // Si el estado es null, asumimos que es borrador (examen recién creado)
-        // Convertir a string para comparación segura (puede venir como '0', 0, null, etc.)
-        $estadoRaw = $examen->estado;
-        $estadoExamen = $estadoRaw !== null ? (string) $estadoRaw : '0';
-
-        \Illuminate\Support\Facades\Log::info('PostulacionController@store - Verificando estado del examen', [
-            'examen_id' => $examen->idExamen,
-            'estado_raw' => $estadoRaw,
-            'estado_raw_type' => gettype($estadoRaw),
-            'estadoExamen' => $estadoExamen,
-            'estadoExamen_type' => gettype($estadoExamen),
-            'comparacion' => $estadoExamen !== '0',
-        ]);
-
-        if ($estadoExamen !== '0') {
-            \Illuminate\Support\Facades\Log::warning('PostulacionController@store - Examen no en borrador', [
+        // Verificar que el examen no esté finalizado
+        try {
+            $this->verificarExamenNoFinalizado($examen);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('PostulacionController@store - Examen finalizado', [
                 'examen_id' => $examen->idExamen,
-                'estado_raw' => $estadoRaw,
-                'estado_raw_type' => gettype($estadoRaw),
-                'estadoExamen' => $estadoExamen,
-                'estadoExamen_type' => gettype($estadoExamen),
+                'estado' => $examen->estado,
+                'error' => $e->getMessage(),
             ]);
             return response()->json([
-                'message' => 'Solo se pueden crear postulaciones en exámenes en estado Borrador'
+                'message' => $e->getMessage(),
             ], 422);
         }
 
@@ -164,8 +163,17 @@ class PostulacionController extends Controller
     /**
      * RF-A.9.1: Actualizar una postulación
      */
-    public function update(Request $request, Postulacion $postulacion)
+    public function update(Request $request, $id)
     {
+        // Obtener la postulación manualmente usando idPostulacion
+        $postulacion = Postulacion::where('idPostulacion', $id)->first();
+
+        if (!$postulacion) {
+            return response()->json([
+                'message' => 'Postulación no encontrada'
+            ], 404);
+        }
+
         $request->validate([
             'nombre' => 'required|string|min:5|max:100',
             'descripcion' => 'nullable|string|max:500',
@@ -194,13 +202,6 @@ class PostulacionController extends Controller
             ], 422);
         }
 
-        // Verificar que el examen esté en borrador
-        if ($examen->estado !== '0') {
-            return response()->json([
-                'message' => 'Solo se pueden modificar postulaciones en exámenes en estado Borrador'
-            ], 422);
-        }
-
         // Verificar que no haya intentos iniciados
         try {
             $this->verificarSinIntentos($examen);
@@ -218,8 +219,17 @@ class PostulacionController extends Controller
     /**
      * RF-A.9.1: Eliminar una postulación
      */
-    public function destroy(Postulacion $postulacion)
+    public function destroy($id)
     {
+        // Obtener la postulación manualmente usando idPostulacion
+        $postulacion = Postulacion::where('idPostulacion', $id)->first();
+
+        if (!$postulacion) {
+            return response()->json([
+                'message' => 'Postulación no encontrada'
+            ], 404);
+        }
+
         $examen = $postulacion->examen;
 
         // Verificar que el examen no esté finalizado
@@ -228,13 +238,6 @@ class PostulacionController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'message' => $e->getMessage(),
-            ], 422);
-        }
-
-        // Verificar que el examen esté en borrador
-        if ($examen->estado !== '0') {
-            return response()->json([
-                'message' => 'Solo se pueden eliminar postulaciones en exámenes en estado Borrador'
             ], 422);
         }
 

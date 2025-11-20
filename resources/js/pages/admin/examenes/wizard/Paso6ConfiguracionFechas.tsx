@@ -30,25 +30,43 @@ const Paso6ConfiguracionFechas: React.FC<Props> = ({
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Función para convertir fecha ISO a formato datetime-local
-  const convertirFechaADatetimeLocal = (fechaISO: string | null | undefined): string => {
-    if (!fechaISO) return '';
+  // Función para convertir fecha a formato datetime-local
+  // Maneja formatos: ISO (2025-11-18T14:30:00), d-m-Y H:i (18-11-2025 14:30), y otros
+  const convertirFechaADatetimeLocal = (fecha: string | null | undefined): string => {
+    if (!fecha) return '';
 
     try {
-      // Crear objeto Date desde la fecha ISO
-      const fecha = new Date(fechaISO);
+      let fechaObj: Date | null = null;
+
+      // Intentar detectar el formato d-m-Y H:i (18-11-2025 14:30)
+      const formatoDMY = /^(\d{2})-(\d{2})-(\d{4})\s+(\d{2}):(\d{2})(?::\d{2})?$/;
+      const matchDMY = fecha.match(formatoDMY);
+      
+      if (matchDMY) {
+        // Formato d-m-Y H:i encontrado
+        const dia = parseInt(matchDMY[1], 10);
+        const mes = parseInt(matchDMY[2], 10) - 1; // Los meses en Date son 0-indexed
+        const año = parseInt(matchDMY[3], 10);
+        const horas = parseInt(matchDMY[4], 10);
+        const minutos = parseInt(matchDMY[5], 10);
+        
+        fechaObj = new Date(año, mes, dia, horas, minutos);
+      } else {
+        // Intentar parsear como ISO o cualquier otro formato
+        fechaObj = new Date(fecha);
+      }
 
       // Verificar que la fecha sea válida
-      if (isNaN(fecha.getTime())) {
+      if (!fechaObj || isNaN(fechaObj.getTime())) {
         return '';
       }
 
       // Obtener año, mes, día, hora y minutos en la zona horaria local
-      const año = fecha.getFullYear();
-      const mes = String(fecha.getMonth() + 1).padStart(2, '0');
-      const dia = String(fecha.getDate()).padStart(2, '0');
-      const horas = String(fecha.getHours()).padStart(2, '0');
-      const minutos = String(fecha.getMinutes()).padStart(2, '0');
+      const año = fechaObj.getFullYear();
+      const mes = String(fechaObj.getMonth() + 1).padStart(2, '0');
+      const dia = String(fechaObj.getDate()).padStart(2, '0');
+      const horas = String(fechaObj.getHours()).padStart(2, '0');
+      const minutos = String(fechaObj.getMinutes()).padStart(2, '0');
 
       // Formato: yyyy-MM-ddThh:mm
       return `${año}-${mes}-${dia}T${horas}:${minutos}`;
@@ -59,13 +77,16 @@ const Paso6ConfiguracionFechas: React.FC<Props> = ({
 
   // Actualizar formData cuando cambie el examen o datosPaso
   useEffect(() => {
-    if (datosPaso) {
+    if (datosPaso && datosPaso.fecha_inicio_vigencia !== undefined && datosPaso.fecha_fin_vigencia !== undefined) {
       // Usar datos del paso cargado desde el wizard
+      const fechaInicio = convertirFechaADatetimeLocal(datosPaso.fecha_inicio_vigencia);
+      const fechaFin = convertirFechaADatetimeLocal(datosPaso.fecha_fin_vigencia);
       setFormData({
-        fecha_inicio_vigencia: convertirFechaADatetimeLocal(datosPaso.fecha_inicio_vigencia),
-        fecha_fin_vigencia: convertirFechaADatetimeLocal(datosPaso.fecha_fin_vigencia),
+        fecha_inicio_vigencia: fechaInicio,
+        fecha_fin_vigencia: fechaFin,
       });
-    } else if (examen) {
+    } else if (examen && (examen.fecha_inicio_vigencia || examen.fecha_fin_vigencia)) {
+      // Si no hay datosPaso o no tiene fechas, usar datos del examen
       setFormData({
         fecha_inicio_vigencia: convertirFechaADatetimeLocal(examen.fecha_inicio_vigencia),
         fecha_fin_vigencia: convertirFechaADatetimeLocal(examen.fecha_fin_vigencia),

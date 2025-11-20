@@ -40,9 +40,10 @@ interface Props {
   soloLectura?: boolean;
   onCerrar: () => void;
   onPreguntasActualizadas?: () => void;
+  mostrarComoModal?: boolean; // Controla si se muestra como modal o contenido incrustado
 }
 
-const EnsambladorExamen: React.FC<Props> = ({ examenId, soloLectura = false, onCerrar, onPreguntasActualizadas }) => {
+const EnsambladorExamen = ({ examenId, soloLectura = false, onCerrar, onPreguntasActualizadas, mostrarComoModal = true }: Props) => {
   const { token } = useAuth();
   const [preguntasDisponibles, setPreguntasDisponibles] = useState<Pregunta[]>([]);
   // Cambiar a estructura organizada por subprueba: { [idSubprueba]: PreguntaExamen[] }
@@ -490,9 +491,8 @@ const EnsambladorExamen: React.FC<Props> = ({ examenId, soloLectura = false, onC
     return doc.body.textContent || doc.body.innerText || '';
   };
 
-  return (
-    <div className="modal-overlay-banco backdrop-blur-md bg-black/30 p-4">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col">
+  const contenido = (
+    <div className={`bg-white rounded-lg shadow-2xl w-full max-w-7xl ${mostrarComoModal ? 'max-h-[95vh]' : 'max-h-[80vh]'} overflow-hidden flex flex-col`}>
         <div className="flex justify-between items-center p-6 border-b bg-white">
           <h3 className="text-2xl font-bold text-gray-900">Ensamblador de Examen</h3>
           <button onClick={onCerrar} className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-full">
@@ -733,6 +733,17 @@ const EnsambladorExamen: React.FC<Props> = ({ examenId, soloLectura = false, onC
           )}
         </div>
       </div>
+  );
+
+  return (
+    <>
+      {mostrarComoModal ? (
+        <div className="fixed inset-0 backdrop-blur-md bg-black/30 p-4 z-50 flex items-center justify-center">
+          {contenido}
+        </div>
+      ) : (
+        contenido
+      )}
 
       {/* Modal para cantidad de preguntas aleatorias con filtros */}
       {mostrarModalCantidad && (
@@ -842,7 +853,7 @@ const EnsambladorExamen: React.FC<Props> = ({ examenId, soloLectura = false, onC
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

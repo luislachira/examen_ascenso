@@ -28,11 +28,29 @@ const DetalleExamen: React.FC = () => {
 
     try {
       // Intentar cargar un intento existente
-      await examenesService.docente.cargarIntento(parseInt(id));
-      // Si hay un intento en curso, redirigir directamente al examen
-      navigate(`/docente/examenes/${id}/iniciar`);
-    } catch {
-      // No hay intento en curso, continuar normalmente
+      const response = await examenesService.docente.cargarIntento(parseInt(id));
+
+      // Si el examen ya fue finalizado, redirigir silenciosamente
+      if (response && 'ya_finalizado' in response && response.ya_finalizado) {
+        navigate(`/docente/examenes`, { replace: true });
+        return;
+      }
+
+      // Si hay un intento en curso (tiene_intento !== false), redirigir directamente al examen
+      if (response && response.tiene_intento !== false) {
+        navigate(`/docente/examenes/${id}/iniciar`);
+      }
+      // Si no hay intento (tiene_intento === false), continuar normalmente
+      // El usuario podrá seleccionar postulación
+    } catch (err: unknown) {
+      // Si el error es porque ya finalizó el examen, redirigir silenciosamente
+      if (err && typeof err === 'object' && 'response' in err &&
+          err.response && typeof err.response === 'object' && 'data' in err.response &&
+          err.response.data && typeof err.response.data === 'object' && 'ya_finalizado' in err.response.data) {
+        navigate(`/docente/examenes`, { replace: true });
+        return;
+      }
+      // Error al cargar intento, continuar normalmente
       // El usuario podrá seleccionar postulación
     }
   };
@@ -59,6 +77,15 @@ const DetalleExamen: React.FC = () => {
         }
       }
     } catch (err: unknown) {
+      // Si el error es porque ya finalizó el examen, redirigir silenciosamente
+      if ((err && typeof err === 'object' && 'response' in err &&
+          err.response && typeof err.response === 'object' && 'data' in err.response &&
+          err.response.data && typeof err.response.data === 'object' && 'ya_finalizado' in err.response.data) ||
+          (err instanceof Error && 'ya_finalizado' in err && (err as Error & { ya_finalizado?: boolean }).ya_finalizado)) {
+        navigate(`/docente/examenes`, { replace: true });
+        return;
+      }
+      
       const errorMessage = (err && typeof err === 'object' && 'response' in err &&
         err.response && typeof err.response === 'object' && 'data' in err.response &&
         err.response.data && typeof err.response.data === 'object' && 'message' in err.response.data &&
@@ -338,7 +365,7 @@ const DetalleExamen: React.FC = () => {
 
       {/* RF-D.1.2: Modal para confirmar postulación */}
       {showModalPostulacion && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 backdrop-blur-md bg-black/30 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="p-6">
               <h3 className="text-xl font-bold text-gray-900 mb-4">
@@ -374,7 +401,6 @@ const DetalleExamen: React.FC = () => {
                     {postulaciones.map(postulacion => (
                       <option key={postulacion.idPostulacion} value={postulacion.idPostulacion}>
                         {postulacion.nombre}
-                        {postulacion.tipo_aprobacion === '1' ? ' (Independiente)' : ' (Conjunta)'}
                       </option>
                     ))}
                   </select>

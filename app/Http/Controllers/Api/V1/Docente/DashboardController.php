@@ -68,6 +68,19 @@ class DashboardController extends Controller
             });
         });
 
+        // Obtener IDs de exámenes que el usuario ya finalizó (tiene intento con estado 'enviado')
+        $examenesFinalizados = DB::table('intento_examenes')
+            ->where('idUsuario', $idUsuario)
+            ->where('estado', 'enviado')
+            ->distinct()
+            ->pluck('idExamen')
+            ->toArray();
+
+        // Excluir exámenes que el usuario ya finalizó (un solo intento por examen)
+        if (!empty($examenesFinalizados)) {
+            $query->whereNotIn('idExamen', $examenesFinalizados);
+        }
+
         // Obtener exámenes ordenados por fecha de inicio de vigencia (más recientes primero)
         // Cargar relación de preguntas y contar preguntas para mostrar total_preguntas
         $examenes = $query->with('tipoConcurso')

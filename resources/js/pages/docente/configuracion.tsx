@@ -1,13 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { useAuth } from '../../hooks/useAuth';
-import clienteApi from '../../api/clienteApi';
 
 const ConfiguracionDocente: React.FC = () => {
-  const { user, updateUser } = useAuth();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [isEditingPerfil, setIsEditingPerfil] = useState(false);
 
   const [configuracion, setConfiguracion] = useState({
     notificaciones_email: true,
@@ -16,90 +14,11 @@ const ConfiguracionDocente: React.FC = () => {
     tema_oscuro: false,
   });
 
-  const [perfilData, setPerfilData] = useState({
-    nombre: user?.nombre || '',
-    apellidos: user?.apellidos || '',
-    correo: user?.correo || '',
-    password: '',
-    confirmPassword: '',
-  });
-
-  useEffect(() => {
-    if (user) {
-      setPerfilData({
-        nombre: user.nombre || '',
-        apellidos: user.apellidos || '',
-        correo: user.correo || '',
-        password: '',
-        confirmPassword: '',
-      });
-    }
-  }, [user]);
-
   const handleChange = (key: string, value: boolean) => {
     setConfiguracion(prev => ({
       ...prev,
       [key]: value,
     }));
-  };
-
-  const handlePerfilChange = (key: string, value: string) => {
-    setPerfilData(prev => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
-
-  const handleSavePerfil = async () => {
-    if (perfilData.password && perfilData.password !== perfilData.confirmPassword) {
-      setMessage({ type: 'error', text: 'Las contraseñas no coinciden' });
-      return;
-    }
-
-    setLoading(true);
-    setMessage(null);
-
-    try {
-      const updateData: {
-        nombre: string;
-        apellidos: string;
-        correo: string;
-        password?: string;
-        password_confirmation?: string;
-      } = {
-        nombre: perfilData.nombre,
-        apellidos: perfilData.apellidos,
-        correo: perfilData.correo,
-      };
-
-      if (perfilData.password) {
-        updateData.password = perfilData.password;
-        updateData.password_confirmation = perfilData.confirmPassword;
-      }
-
-      await clienteApi.put('/profile', updateData);
-
-      if (updateUser) {
-        updateUser({
-          ...user,
-          nombre: perfilData.nombre,
-          apellidos: perfilData.apellidos,
-          correo: perfilData.correo,
-        });
-      }
-
-      setPerfilData(prev => ({ ...prev, password: '', confirmPassword: '' }));
-      setIsEditingPerfil(false);
-      setMessage({ type: 'success', text: 'Perfil actualizado exitosamente' });
-    } catch (error: unknown) {
-      const apiError = error as { response?: { data?: { message?: string } } };
-      setMessage({
-        type: 'error',
-        text: apiError.response?.data?.message || 'Error al actualizar el perfil'
-      });
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleSave = async () => {
@@ -215,121 +134,60 @@ const ConfiguracionDocente: React.FC = () => {
           </div>
         </Card>
 
-        {/* RF-D.1.1: Gestión de Perfil (Escala Actual) */}
+        {/* Información del Sistema */}
         <Card className="p-6 mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Mi Perfil</h2>
-            {!isEditingPerfil ? (
-              <button
-                onClick={() => setIsEditingPerfil(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-              >
-                Editar Perfil
-              </button>
-            ) : (
-              <div className="flex gap-2">
-                <button
-                  onClick={handleSavePerfil}
-                  disabled={loading}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
-                >
-                  {loading ? 'Guardando...' : 'Guardar'}
-                </button>
-                <button
-                  onClick={() => {
-                    setIsEditingPerfil(false);
-                    setPerfilData({
-                      nombre: user?.nombre || '',
-                      apellidos: user?.apellidos || '',
-                      correo: user?.correo || '',
-                      password: '',
-                      confirmPassword: '',
-                    });
-                    setMessage(null);
-                  }}
-                  disabled={loading}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
-              </div>
-            )}
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Información del Sistema</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="text-gray-600">Versión del Sistema:</span>
+              <span className="ml-2 font-medium text-gray-900">1.0.0</span>
+            </div>
+            <div>
+              <span className="text-gray-600">Usuario Actual:</span>
+              <span className="ml-2 font-medium text-gray-900">
+                {user?.nombre} {user?.apellidos}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-600">Rol:</span>
+              <span className="ml-2 font-medium text-gray-900">Docente</span>
+            </div>
+            <div>
+              <span className="text-gray-600">Última Actualización:</span>
+              <span className="ml-2 font-medium text-gray-900">
+                {new Date().toLocaleDateString('es-ES')}
+              </span>
+            </div>
           </div>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          {/* Información del Desarrollador */}
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Desarrollador del Sistema</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-                {isEditingPerfil ? (
-                  <input
-                    type="text"
-                    value={perfilData.nombre}
-                    onChange={(e) => handlePerfilChange('nombre', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  />
-                ) : (
-                  <p className="text-gray-900">{user?.nombre}</p>
-                )}
+                <span className="text-gray-600">Nombre:</span>
+                <span className="ml-2 font-medium text-gray-900">Luis Lachira Nima</span>
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Apellidos</label>
-                {isEditingPerfil ? (
-                  <input
-                    type="text"
-                    value={perfilData.apellidos}
-                    onChange={(e) => handlePerfilChange('apellidos', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  />
-                ) : (
-                  <p className="text-gray-900">{user?.apellidos}</p>
-                )}
+                <span className="text-gray-600">Correo:</span>
+                <a 
+                  href="mailto:luislachiraofi1@gmail.com" 
+                  className="ml-2 font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                >
+                  luislachiraofi1@gmail.com
+                </a>
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
-                {isEditingPerfil ? (
-                  <input
-                    type="email"
-                    value={perfilData.correo}
-                    onChange={(e) => handlePerfilChange('correo', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  />
-                ) : (
-                  <p className="text-gray-900">{user?.correo}</p>
-                )}
+                <span className="text-gray-600">GitHub:</span>
+                <a 
+                  href="https://github.com/luislachira" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="ml-2 font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                >
+                  luislachira
+                </a>
               </div>
-
-
-              {isEditingPerfil && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nueva Contraseña (opcional)
-                    </label>
-                    <input
-                      type="password"
-                      value={perfilData.password}
-                      onChange={(e) => handlePerfilChange('password', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                      placeholder="Dejar vacío para no cambiar"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Confirmar Contraseña
-                    </label>
-                    <input
-                      type="password"
-                      value={perfilData.confirmPassword}
-                      onChange={(e) => handlePerfilChange('confirmPassword', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                      placeholder="Confirmar nueva contraseña"
-                    />
-                  </div>
-                </>
-              )}
             </div>
           </div>
         </Card>

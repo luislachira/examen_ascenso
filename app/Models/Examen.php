@@ -298,43 +298,100 @@ class Examen extends Model
 
         // Verificar y actualizar el estado del examen cuando se accede a él
         static::retrieved(function ($examen) {
-            // Solo verificar si el examen tiene fechas de vigencia y no está en el estado final
-            if (($examen->fecha_inicio_vigencia || $examen->fecha_fin_vigencia) && $examen->estado !== '2') {
-                // Usar el servicio centralizado para garantizar consistencia
-                $ahora = \App\Services\FechaService::ahora();
-                $ahoraStr = \App\Services\FechaService::ahoraString();
+            try {
+                // Obtener valores raw primero para evitar problemas con accessors
+                $fechaInicioRaw = null;
+                $fechaFinRaw = null;
+                $estado = null;
+                
+                try {
+                    $fechaInicioRaw = $examen->getRawOriginal('fecha_inicio_vigencia');
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::warning('Error al obtener fecha_inicio_vigencia raw en evento retrieved', [
+                        'examen_id' => $examen->idExamen ?? null,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+                
+                try {
+                    $fechaFinRaw = $examen->getRawOriginal('fecha_fin_vigencia');
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::warning('Error al obtener fecha_fin_vigencia raw en evento retrieved', [
+                        'examen_id' => $examen->idExamen ?? null,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+                
+                try {
+                    $estado = $examen->getRawOriginal('estado') ?? $examen->estado ?? '0';
+                } catch (\Exception $e) {
+                    $estado = '0';
+                }
+                
+                // Solo verificar si el examen tiene fechas de vigencia y no está en el estado final
+                if (($fechaInicioRaw || $fechaFinRaw) && $estado !== '2') {
+                    // Usar el servicio centralizado para garantizar consistencia
+                    $ahora = \App\Services\FechaService::ahora();
+                    $ahoraStr = \App\Services\FechaService::ahoraString();
 
-                $fechaInicioRaw = $examen->getRawOriginal('fecha_inicio_vigencia');
-                $fechaFinRaw = $examen->getRawOriginal('fecha_fin_vigencia');
+                    $necesitaActualizacion = false;
 
-                $necesitaActualizacion = false;
+                    // Verificar si necesita publicarse
+                    // IMPORTANTE: Solo publicar automáticamente si el examen está completo
+                    if ($estado === '0' && $fechaInicioRaw && strcmp($ahoraStr, $fechaInicioRaw) >= 0) {
+                        try {
+                            // Verificar que el examen esté completo antes de publicar
+                            $completitudService = new \App\Services\ExamenCompletitudService();
+                            if ($completitudService->puedePublicar($examen)) {
+                                $examen->estado = '1';
+                                $necesitaActualizacion = true;
+                            }
+                        } catch (\Exception $e) {
+                            \Illuminate\Support\Facades\Log::warning('Error al verificar completitud en evento retrieved', [
+                                'examen_id' => $examen->idExamen ?? null,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
 
-                // Verificar si necesita publicarse
-                // IMPORTANTE: Solo publicar automáticamente si el examen está completo
-                if ($examen->estado === '0' && $fechaInicioRaw && strcmp($ahoraStr, $fechaInicioRaw) >= 0) {
-                    // Verificar que el examen esté completo antes de publicar
-                    $completitudService = new \App\Services\ExamenCompletitudService();
-                    if ($completitudService->puedePublicar($examen)) {
-                        $examen->estado = '1';
-                        $necesitaActualizacion = true;
+                    // Verificar si necesita finalizarse
+                    if ($estado === '1' && $fechaFinRaw && strcmp($ahoraStr, $fechaFinRaw) >= 0) {
+                        try {
+                            $intentosEnProgreso = $examen->intentos()->where('estado', 'iniciado')->get();
+                            foreach ($intentosEnProgreso as $intento) {
+                                $intento->estado = 'enviado';
+                                $intento->hora_fin = $ahora;
+                                $intento->save();
+                            }
+                            $examen->estado = '2';
+                            $necesitaActualizacion = true;
+                        } catch (\Exception $e) {
+                            \Illuminate\Support\Facades\Log::warning('Error al finalizar examen en evento retrieved', [
+                                'examen_id' => $examen->idExamen ?? null,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
+
+                    if ($necesitaActualizacion) {
+                        try {
+                            $examen->save();
+                        } catch (\Exception $e) {
+                            \Illuminate\Support\Facades\Log::error('Error al guardar examen en evento retrieved', [
+                                'examen_id' => $examen->idExamen ?? null,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
                     }
                 }
-
-                // Verificar si necesita finalizarse
-                if ($examen->estado === '1' && $fechaFinRaw && strcmp($ahoraStr, $fechaFinRaw) >= 0) {
-                    $intentosEnProgreso = $examen->intentos()->where('estado', 'iniciado')->get();
-                    foreach ($intentosEnProgreso as $intento) {
-                        $intento->estado = 'enviado';
-                        $intento->hora_fin = $ahora;
-                        $intento->save();
-                    }
-                    $examen->estado = '2';
-                    $necesitaActualizacion = true;
-                }
-
-                if ($necesitaActualizacion) {
-                    $examen->save();
-                }
+            } catch (\Exception $e) {
+                // Si hay cualquier error en el evento retrieved, registrarlo pero no fallar
+                // Esto evita que el evento cause errores 500 en las consultas
+                \Illuminate\Support\Facades\Log::error('Error en evento retrieved del modelo Examen', [
+                    'examen_id' => $examen->idExamen ?? null,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
             }
         });
     }

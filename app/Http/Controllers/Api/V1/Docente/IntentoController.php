@@ -24,6 +24,20 @@ class IntentoController extends Controller
     {
         $usuario = Auth::user();
 
+        // Verificar que el usuario no haya finalizado este examen (un solo intento por examen)
+        $examenFinalizado = IntentoExamen::where('idExamen', $examen->idExamen)
+            ->where('idUsuario', $usuario->idUsuario)
+            ->where('estado', 'enviado')
+            ->first();
+
+        if ($examenFinalizado) {
+            return response()->json([
+                'message' => 'Ya has finalizado este examen. Solo se permite un intento por examen.',
+                'ya_finalizado' => true,
+                'tiene_intento' => false
+            ], 422);
+        }
+
         // Buscar intento en curso para este examen y usuario
         $intento = IntentoExamen::where('idExamen', $examen->idExamen)
             ->where('idUsuario', $usuario->idUsuario)
@@ -31,13 +45,16 @@ class IntentoController extends Controller
             ->first();
 
         if (!$intento) {
+            // Devolver 200 con un indicador de que no hay intento en curso
+            // El frontend usa esto para verificar si debe redirigir o mostrar la selección de postulación
             return response()->json([
-                'message' => 'No hay un intento en curso para este examen'
-            ], 404);
+                'message' => 'No hay un intento en curso para este examen',
+                'tiene_intento' => false
+            ], 200);
         }
 
         // Verificar que el tiempo no haya expirado
-        $ahora = Carbon::now();
+        $ahora = Carbon::now(config('app.timezone'));
         if ($intento->hora_fin && $ahora->greaterThan($intento->hora_fin)) {
             // El tiempo se acabó, finalizar automáticamente
             $intento->estado = 'enviado';
@@ -154,8 +171,8 @@ class IntentoController extends Controller
         ];
 
         // Calcular tiempo restante en segundos
-        $ahora = Carbon::now();
-        $fin = Carbon::parse($intento->hora_fin);
+        $ahora = Carbon::now(config('app.timezone'));
+        $fin = Carbon::parse($intento->hora_fin)->setTimezone(config('app.timezone'));
         $tiempoRestante = max(0, $ahora->diffInSeconds($fin, false));
 
         // Obtener información de navegación: qué preguntas están disponibles
@@ -227,6 +244,7 @@ class IntentoController extends Controller
             'preguntas_disponibles' => $preguntasDisponibles['preguntas_disponibles'],
             'ultima_pregunta_vista' => $preguntaInicial, // Índice de la pregunta inicial
             'respuestas_guardadas' => $respuestasGuardadas, // Respuestas guardadas del intento
+            'tiene_intento' => true, // Indicador de que hay un intento en curso
         ]);
     }
 
@@ -237,6 +255,19 @@ class IntentoController extends Controller
     {
         /** @var \App\Models\Usuario $usuario */
         $usuario = Auth::user();
+
+        // Verificar que el usuario no haya finalizado este examen (un solo intento por examen)
+        $examenFinalizado = IntentoExamen::where('idExamen', $examen->idExamen)
+            ->where('idUsuario', $usuario->idUsuario)
+            ->where('estado', 'enviado')
+            ->first();
+
+        if ($examenFinalizado) {
+            return response()->json([
+                'message' => 'Ya has finalizado este examen. Solo se permite un intento por examen.',
+                'ya_finalizado' => true
+            ], 422);
+        }
 
         // Verificar si ya existe un intento en curso para este examen y usuario
         $intentoExistente = IntentoExamen::where('idExamen', $examen->idExamen)
@@ -308,8 +339,8 @@ class IntentoController extends Controller
                 })->sortBy('orden')->values(),
             ];
 
-            $ahora = Carbon::now();
-            $fin = Carbon::parse($intentoExistente->hora_fin);
+            $ahora = Carbon::now(config('app.timezone'));
+            $fin = Carbon::parse($intentoExistente->hora_fin)->setTimezone(config('app.timezone'));
             $tiempoRestante = max(0, $ahora->diffInSeconds($fin, false));
 
             $preguntasArray = is_array($examenData['preguntas'])
@@ -427,7 +458,7 @@ class IntentoController extends Controller
         }
 
         // RF-D.2.1: Calcular hora_fin = hora_inicio + tiempo_limite minutos
-        $horaInicio = Carbon::now();
+        $horaInicio = Carbon::now(config('app.timezone'));
         $horaFin = $horaInicio->copy()->addMinutes($examen->tiempo_limite);
 
         $intento = IntentoExamen::create([
@@ -626,7 +657,7 @@ class IntentoController extends Controller
         ]);
 
         // RF-D.2.3: Validar que el tiempo no haya expirado
-        $ahora = Carbon::now();
+        $ahora = Carbon::now(config('app.timezone'));
         if ($intentoExamen->hora_fin && $ahora->greaterThan($intentoExamen->hora_fin)) {
             // El tiempo se acabó, ignorar la respuesta
             return response()->json([
@@ -938,8 +969,22 @@ class IntentoController extends Controller
             ->get()
             ->keyBy('idSubprueba');
 
+        // Filtrar resultados de subpruebas según el tipo de aprobación
+        $resultadosSubpruebasFiltrados = $intentoExamen->resultadosSubprueba;
+        $tipoAprobacion = $intentoExamen->postulacion->tipo_aprobacion ?? '0';
+
+        // Si el tipo de aprobación es independiente, mostrar solo la subprueba seleccionada
+        if ($tipoAprobacion === '1' && $intentoExamen->idSubpruebaSeleccionada) {
+            $resultadosSubpruebasFiltrados = $resultadosSubpruebasFiltrados->filter(function ($resultado) use ($intentoExamen) {
+                return $resultado->idSubprueba == $intentoExamen->idSubpruebaSeleccionada;
+            })->unique('idSubprueba'); // Evitar duplicados si existen en la BD
+        } else {
+            // Para aprobación conjunta, también eliminar duplicados por idSubprueba
+            $resultadosSubpruebasFiltrados = $resultadosSubpruebasFiltrados->unique('idSubprueba');
+        }
+
         // Calcular preguntas correctas y puntaje máximo por subprueba
-        $resultadosSubpruebasConCorrectas = $intentoExamen->resultadosSubprueba->map(function ($resultado) use ($intentoExamen, $preguntasExamen, $reglasPuntaje) {
+        $resultadosSubpruebasConCorrectas = $resultadosSubpruebasFiltrados->map(function ($resultado) use ($intentoExamen, $preguntasExamen, $reglasPuntaje) {
             $idSubprueba = $resultado->idSubprueba;
 
             // Filtrar respuestas de esta subprueba
@@ -1004,6 +1049,12 @@ class IntentoController extends Controller
 
         return response()->json([
             'intento' => $intentoFormateado,
+            'postulacion' => $intentoExamen->postulacion ? [
+                'idPostulacion' => $intentoExamen->postulacion->idPostulacion,
+                'nombre' => $intentoExamen->postulacion->nombre,
+                'descripcion' => $intentoExamen->postulacion->descripcion,
+                'tipo_aprobacion' => $intentoExamen->postulacion->tipo_aprobacion,
+            ] : null,
             'respuestas' => $respuestasFormateadas,
             'resultados_subpruebas' => $resultadosSubpruebasConCorrectas,
         ]);
@@ -1168,7 +1219,7 @@ class IntentoController extends Controller
         }
 
         // Verificar que el tiempo no haya expirado
-        $ahora = Carbon::now();
+        $ahora = Carbon::now(config('app.timezone'));
         if ($intentoExamen->hora_fin && $ahora->greaterThan($intentoExamen->hora_fin)) {
             return response()->json([
                 'message' => 'El tiempo del examen ha finalizado',

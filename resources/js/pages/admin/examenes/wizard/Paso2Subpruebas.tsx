@@ -30,6 +30,9 @@ const Paso2Subpruebas: React.FC<Props> = ({
   const [formData, setFormData] = useState({ nombre: '' });
   const datosCargadosRef = React.useRef<string | null>(null);
 
+  // Verificar si el examen está finalizado (estado '1' = publicado o '2' = finalizado)
+  const examenFinalizado = (examen?.estado === '1' || examen?.estado === '2');
+
   // Calcular el siguiente orden disponible
   const calcularSiguienteOrden = React.useCallback(() => {
     if (subpruebas.length === 0) {
@@ -94,10 +97,9 @@ const Paso2Subpruebas: React.FC<Props> = ({
   const handleCrearSubprueba = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Verificar que el examen no esté publicado (estado '1')
-    // Se puede editar en borrador (estado '0') y finalizado (estado '2')
-    if (!examen || examen.estado === '1') {
-      setError('No se pueden crear subpruebas cuando el examen está publicado. Debe finalizar el examen primero para poder editarlo.');
+    // Verificar que el examen no esté finalizado (estado '1' = publicado o '2' = finalizado)
+    if (!examen || examenFinalizado) {
+      setError('No se pueden crear subpruebas cuando el examen está finalizado.');
       return;
     }
 
@@ -125,7 +127,22 @@ const Paso2Subpruebas: React.FC<Props> = ({
       setError(null);
     } catch (err: unknown) {
       const axiosError = err as AxiosErrorResponse;
-      setError(axiosError.response?.data?.message || 'Error al crear la subprueba');
+      const errorData = axiosError.response?.data;
+
+      // Manejar errores de validación de Laravel
+      if (errorData && 'errors' in errorData && errorData.errors) {
+        const errors = errorData.errors as Record<string, string[]>;
+        // Obtener el primer error disponible
+        const firstErrorKey = Object.keys(errors)[0];
+        if (firstErrorKey && errors[firstErrorKey] && errors[firstErrorKey].length > 0) {
+          setError(errors[firstErrorKey][0]);
+        } else {
+          setError(errorData.message || 'Error al crear la subprueba');
+        }
+      } else {
+        const message = errorData?.message || (errorData && 'mensaje' in errorData ? errorData.mensaje : undefined);
+        setError(message || 'Error al crear la subprueba');
+      }
     } finally {
       setLoading(false);
     }
@@ -133,8 +150,8 @@ const Paso2Subpruebas: React.FC<Props> = ({
 
   const handleEditarSubprueba = (subprueba: Subprueba) => {
     // Verificar que el examen no esté publicado (estado '1')
-    if (!examen || examen.estado === '1') {
-      setError('No se pueden editar subpruebas cuando el examen está publicado. Debe finalizar el examen primero para poder editarlo.');
+    if (!examen || examenFinalizado) {
+      setError('No se pueden editar subpruebas cuando el examen está finalizado.');
       return;
     }
     setEditingSubprueba(subprueba);
@@ -148,8 +165,8 @@ const Paso2Subpruebas: React.FC<Props> = ({
     if (!editingSubprueba) return;
 
     // Verificar que el examen no esté publicado (estado '1')
-    if (!examen || examen.estado === '1') {
-      setError('No se pueden editar subpruebas cuando el examen está publicado. Debe finalizar el examen primero para poder editarlo.');
+    if (!examen || examenFinalizado) {
+      setError('No se pueden editar subpruebas cuando el examen está finalizado.');
       return;
     }
 
@@ -164,7 +181,7 @@ const Paso2Subpruebas: React.FC<Props> = ({
         nombre: formData.nombre.trim(),
         orden: editingSubprueba.orden || 1,
         puntaje_por_pregunta: editingSubprueba.puntaje_por_pregunta || 0,
-        duracion_minutos: editingSubprueba.duracion_minutos || 0
+        duracion_minutos: editingSubprueba.duracion_minutos && editingSubprueba.duracion_minutos > 0 ? editingSubprueba.duracion_minutos : 1
       });
 
       await cargarSubpruebas();
@@ -174,7 +191,22 @@ const Paso2Subpruebas: React.FC<Props> = ({
       setError(null);
     } catch (err: unknown) {
       const axiosError = err as AxiosErrorResponse;
-      setError(axiosError.response?.data?.message || 'Error al actualizar la subprueba');
+      const errorData = axiosError.response?.data;
+
+      // Manejar errores de validación de Laravel
+      if (errorData && 'errors' in errorData && errorData.errors) {
+        const errors = errorData.errors as Record<string, string[]>;
+        // Obtener el primer error disponible
+        const firstErrorKey = Object.keys(errors)[0];
+        if (firstErrorKey && errors[firstErrorKey] && errors[firstErrorKey].length > 0) {
+          setError(errors[firstErrorKey][0]);
+        } else {
+          setError(errorData.message || 'Error al actualizar la subprueba');
+        }
+      } else {
+        const message = errorData?.message || (errorData && 'mensaje' in errorData ? errorData.mensaje : undefined);
+        setError(message || 'Error al actualizar la subprueba');
+      }
     } finally {
       setLoading(false);
     }
@@ -182,8 +214,8 @@ const Paso2Subpruebas: React.FC<Props> = ({
 
   const handleEliminar = async (id: number) => {
     // Verificar que el examen no esté publicado (estado '1')
-    if (!examen || examen.estado === '1') {
-      setError('No se pueden eliminar subpruebas cuando el examen está publicado. Debe finalizar el examen primero para poder editarlo.');
+    if (!examen || examenFinalizado) {
+      setError('No se pueden eliminar subpruebas cuando el examen está finalizado.');
       return;
     }
 
@@ -213,7 +245,7 @@ const Paso2Subpruebas: React.FC<Props> = ({
         </p>
       </div>
 
-      {error && (
+      {error && !showModal && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-red-800 text-sm">{error}</p>
         </div>
@@ -223,7 +255,7 @@ const Paso2Subpruebas: React.FC<Props> = ({
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-medium text-gray-900">Subpruebas Creadas</h3>
-          {!soloLectura && examen && examen.estado !== '1' && (
+          {!soloLectura && examen && !examenFinalizado && (
             <button
               onClick={() => {
                 setFormData({ nombre: '' });
@@ -257,7 +289,7 @@ const Paso2Subpruebas: React.FC<Props> = ({
                     Preguntas asignadas: 0 (se asignarán en el Paso 5)
                   </p>
                 </div>
-                {!soloLectura && examen && examen.estado !== '1' && (
+                {!soloLectura && examen && !examenFinalizado && (
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleEditarSubprueba(subprueba)}
@@ -296,6 +328,12 @@ const Paso2Subpruebas: React.FC<Props> = ({
             <h3 className="text-lg font-semibold mb-4">
               {editingSubprueba ? 'Editar Subprueba' : 'Crear Subprueba'}
             </h3>
+
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-800 text-sm">{error}</p>
+              </div>
+            )}
 
             <form onSubmit={editingSubprueba ? handleActualizarSubprueba : handleCrearSubprueba}>
               <div className="space-y-4">

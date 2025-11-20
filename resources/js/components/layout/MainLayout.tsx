@@ -1,5 +1,6 @@
 import React from 'react';
 import Sidebar from './Sidebar';
+import Footer from './Footer';
 import '@css/MainLayout.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useAutoLogout } from '../../hooks/useAutoLogout';
@@ -38,6 +39,7 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <Sidebar user={{ fullName, role }} />
                 <main className="content-area">
                     {children}
+                    <Footer />
                 </main>
 
                 {/* Modal de advertencia de inactividad */}

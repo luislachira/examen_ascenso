@@ -13,6 +13,15 @@ class Postulacion extends Model
     protected $primaryKey = 'idPostulacion';
     public $incrementing = true;
 
+    /**
+     * Get the route key for the model.
+     * Esto permite que Laravel use idPostulacion en lugar de id para el route model binding
+     */
+    public function getRouteKeyName()
+    {
+        return 'idPostulacion';
+    }
+
     protected $fillable = [
         'idExamen',
         'nombre',

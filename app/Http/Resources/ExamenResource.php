@@ -69,7 +69,7 @@ class ExamenResource extends JsonResource
         try {
             // Si es una instancia de Carbon, formatear directamente
             if ($date instanceof Carbon) {
-                return $date->format('d-m-Y');
+                return $date->format('d-m-Y H:i');
             }
 
             // Si es string, intentar parsearlo
@@ -78,12 +78,12 @@ class ExamenResource extends JsonResource
                 if (trim($date) === '') {
                     return null;
                 }
-                return Carbon::parse($date)->format('d-m-Y');
+                return Carbon::parse($date)->format('d-m-Y H:i');
             }
 
             // Si es un objeto DateTime, convertirlo a Carbon
             if ($date instanceof \DateTime) {
-                return Carbon::instance($date)->format('d-m-Y');
+                return Carbon::instance($date)->format('d-m-Y H:i');
             }
 
             return null;

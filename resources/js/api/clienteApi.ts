@@ -103,6 +103,18 @@ clienteApi.interceptors.response.use(
                 }
             }
         }
+        
+        // Silenciar errores 422 cuando el examen ya fue finalizado
+        // Estos errores se manejan en los componentes y no necesitan aparecer en la consola
+        if (error.response?.status === 422) {
+            const errorData = error.response?.data as { ya_finalizado?: boolean } | undefined;
+            if (errorData?.ya_finalizado === true) {
+                // Retornar el error sin que aparezca en la consola
+                // Los componentes lo manejarán apropiadamente
+                return Promise.reject(error);
+            }
+        }
+        
         return Promise.reject(error);
     }
 );

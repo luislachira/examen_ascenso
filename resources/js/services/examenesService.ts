@@ -355,18 +355,43 @@ export const examenesService = {
      * Incluye instrucciones completas y toda la información
      */
     getDetalleExamen: async (examenId: number): Promise<Examen> => {
-      const response = await clienteApi.get(`/docente/examenes/${examenId}`);
-      const examen = response.data.data || response.data;
+      try {
+        const response = await clienteApi.get(`/docente/examenes/${examenId}`, {
+          validateStatus: (status) => {
+            // Permitir 422 para manejar el caso de examen ya finalizado sin mostrar error en consola
+            return status < 500;
+          }
+        });
+        
+        // Si es 422 y tiene ya_finalizado, lanzar error especial
+        if (response.status === 422 && response.data && typeof response.data === 'object' && 'ya_finalizado' in response.data) {
+          const error = new Error('Examen ya finalizado') as Error & { ya_finalizado?: boolean };
+          error.ya_finalizado = true;
+          throw error;
+        }
+        
+        const examen = response.data.data || response.data;
 
-      // Mapear idExamen a id para compatibilidad con el frontend
-      if (examen) {
-        return {
-          ...examen,
-          id: examen.idExamen || examen.id
-        };
+        // Mapear idExamen a id para compatibilidad con el frontend
+        if (examen) {
+          return {
+            ...examen,
+            id: examen.idExamen || examen.id
+          };
+        }
+
+        return examen;
+      } catch (err: unknown) {
+        // Si el error es porque ya finalizó el examen, lanzar un error especial
+        if (err && typeof err === 'object' && 'response' in err &&
+            err.response && typeof err.response === 'object' && 'data' in err.response &&
+            err.response.data && typeof err.response.data === 'object' && 'ya_finalizado' in err.response.data) {
+          const error = new Error('Examen ya finalizado') as Error & { ya_finalizado?: boolean };
+          error.ya_finalizado = true;
+          throw error;
+        }
+        throw err;
       }
-
-      return examen;
     },
 
     /**
@@ -405,7 +430,7 @@ export const examenesService = {
      * RF-D.2.2: Cargar intento ya iniciado
      */
     cargarIntento: async (examenId: number): Promise<{
-      intento: {
+      intento?: {
         idIntento: number;
         idExamen: number;
         idUsuario: number;
@@ -414,18 +439,42 @@ export const examenesService = {
         hora_fin: string;
         estado: string;
       };
-      examen: Examen;
-      tiempo_limite: number;
-      tiempo_restante: number; // Tiempo restante en segundos
-      hora_fin: string; // RF-D.2.2: Hora de finalización del servidor
-      resultado_id: number;
-      pregunta_actual_permitida: number;
-      preguntas_disponibles: number[];
+      examen?: Examen;
+      tiempo_limite?: number;
+      tiempo_restante?: number; // Tiempo restante en segundos
+      hora_fin?: string; // RF-D.2.2: Hora de finalización del servidor
+      resultado_id?: number;
+      pregunta_actual_permitida?: number;
+      preguntas_disponibles?: number[];
       ultima_pregunta_vista?: number; // Índice de la última pregunta vista
       respuestas_guardadas?: { [preguntaId: string]: number[] }; // Respuestas guardadas del intento
+      tiene_intento?: boolean; // Indicador de si hay un intento en curso
+      message?: string; // Mensaje cuando no hay intento
+      ya_finalizado?: boolean; // Indicador de que el examen ya fue finalizado
     }> => {
-      const response = await clienteApi.get(`/docente/examenes/${examenId}/intento`);
-      return response.data;
+      try {
+        const response = await clienteApi.get(`/docente/examenes/${examenId}/intento`, {
+          validateStatus: (status) => {
+            // No lanzar excepción para 422 si es porque el examen ya fue finalizado
+            return status < 500;
+          }
+        });
+        
+        // Si es 422 y tiene ya_finalizado, retornar el objeto con la bandera
+        if (response.status === 422 && response.data && typeof response.data === 'object' && 'ya_finalizado' in response.data) {
+          return { ya_finalizado: true, tiene_intento: false };
+        }
+        
+        return response.data;
+      } catch (err: unknown) {
+        // Si el error es porque ya finalizó el examen, retornar objeto con la bandera
+        if (err && typeof err === 'object' && 'response' in err &&
+            err.response && typeof err.response === 'object' && 'data' in err.response &&
+            err.response.data && typeof err.response.data === 'object' && 'ya_finalizado' in err.response.data) {
+          return { ya_finalizado: true, tiene_intento: false };
+        }
+        throw err;
+      }
     },
 
     /**

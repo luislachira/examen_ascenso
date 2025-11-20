@@ -54,9 +54,16 @@ const TomarExamen: React.FC = () => {
   // El examen ya debería estar iniciado desde DetalleExamen
   useEffect(() => {
     if (id && !examenActivo && !loading) {
-      cargarIntento(parseInt(id));
+      cargarIntento(parseInt(id)).catch((err: unknown) => {
+        // Si el error es porque ya finalizó el examen, redirigir silenciosamente
+        if (err && typeof err === 'object' && 'response' in err &&
+            err.response && typeof err.response === 'object' && 'data' in err.response &&
+            err.response.data && typeof err.response.data === 'object' && 'ya_finalizado' in err.response.data) {
+          navigate('/docente/examenes', { replace: true });
+        }
+      });
     }
-  }, [id, examenActivo, loading, cargarIntento]);
+  }, [id, examenActivo, loading, cargarIntento, navigate]);
 
   // Cargar respuesta guardada al cambiar de pregunta
   useEffect(() => {
@@ -759,8 +766,8 @@ const TomarExamen: React.FC = () => {
 
       {/* Modal de confirmación para salir */}
       {showConfirmExit && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 md:left-[240px] backdrop-blur-md bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl">
             <h3 className="text-lg font-medium text-gray-900 mb-4">
               ¿Salir del examen?
             </h3>
@@ -787,8 +794,8 @@ const TomarExamen: React.FC = () => {
 
       {/* Modal de confirmación para finalizar */}
       {showConfirmSubmit && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 md:left-[240px] backdrop-blur-md bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl">
             <h3 className="text-lg font-medium text-gray-900 mb-4">
               ¿Finalizar examen?
             </h3>

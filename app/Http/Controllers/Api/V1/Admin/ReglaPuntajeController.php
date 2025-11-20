@@ -25,13 +25,13 @@ class ReglaPuntajeController extends Controller
     }
 
     /**
-     * Verificar si el examen está finalizado (estado = '2')
+     * Verificar si el examen está finalizado (estado = '1' publicado o '2' finalizado)
      * Si está finalizado, lanzar una excepción
      */
     private function verificarExamenNoFinalizado(Subprueba $subprueba): void
     {
         $examen = $subprueba->examen;
-        if ($examen && $examen->estado === '2') {
+        if ($examen && ($examen->estado === '1' || $examen->estado === '2')) {
             throw new \Exception(
                 'No se puede modificar un examen finalizado. Solo se puede ver su configuración, duplicarlo o eliminarlo.'
             );
@@ -44,14 +44,41 @@ class ReglaPuntajeController extends Controller
      */
     public function index($id)
     {
-        // Obtener la postulación manualmente usando idPostulacion
-        $postulacion = \App\Models\Postulacion::where('idPostulacion', $id)->firstOrFail();
+        try {
+            // Obtener la postulación manualmente usando idPostulacion
+            $postulacion = \App\Models\Postulacion::where('idPostulacion', $id)->firstOrFail();
 
-        $reglas = ReglaPuntaje::where('idPostulacion', $postulacion->idPostulacion)
-            ->with(['subprueba'])
-            ->orderBy('idSubprueba')
-            ->get();
-        return response()->json($reglas);
+            // Cargar reglas con subprueba, filtrando las que tienen subprueba válida
+            $reglas = ReglaPuntaje::where('idPostulacion', $postulacion->idPostulacion)
+                ->with(['subprueba' => function ($query) {
+                    // Solo cargar subpruebas que existan
+                    $query->whereNotNull('idSubprueba');
+                }])
+                ->whereHas('subprueba') // Solo incluir reglas que tengan una subprueba válida
+                ->orderBy('idSubprueba')
+                ->get();
+
+            return response()->json($reglas);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            \Illuminate\Support\Facades\Log::error('ReglaPuntajeController@index - Postulación no encontrada', [
+                'postulacion_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json([
+                'message' => 'Postulación no encontrada',
+                'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
+            ], 404);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('ReglaPuntajeController@index - Error al obtener reglas', [
+                'postulacion_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'message' => 'Error al cargar las reglas de puntaje',
+                'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
+            ], 500);
+        }
     }
 
     /**
@@ -138,12 +165,21 @@ class ReglaPuntajeController extends Controller
             ], 422);
         }
 
-        // Verificar que no haya intentos iniciados
         // Cargar la relación del examen si no está cargada
         if (!$subprueba->relationLoaded('examen')) {
             $subprueba->load('examen');
         }
 
+        // Verificar que el examen no esté finalizado
+        try {
+            $this->verificarExamenNoFinalizado($subprueba);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+
+        // Verificar que no haya intentos iniciados
         try {
             $this->verificarSinIntentos($subprueba);
         } catch (\Exception $e) {

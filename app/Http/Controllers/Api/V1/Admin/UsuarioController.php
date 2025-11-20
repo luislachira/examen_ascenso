@@ -10,21 +10,43 @@ use Illuminate\Support\Facades\Hash;
 class UsuarioController extends Controller
 {
     /**
-     * Muestra una lista de los usuarios.
-     * Permite filtrar por estado (ej. /usuarios?estado=0 para pendientes).
+     * Muestra una lista de los usuarios paginados.
+     * Permite filtrar por estado y rol, y buscar por nombre o correo.
+     * Retorna 10 usuarios por página.
      */
     public function index(Request $request)
     {
         $query = Usuario::query();
 
-        if ($request->has('estado')) {
+        // Filtrar por estado si se proporciona
+        if ($request->has('estado') && $request->estado !== 'todos') {
             $query->where('estado', $request->estado);
         }
 
-        $usuarios = $query->orderBy('created_at', 'desc')->get();
+        // Filtrar por rol si se proporciona
+        if ($request->has('rol') && $request->rol !== 'todos') {
+            $query->where('rol', $request->rol);
+        }
+
+        // Buscar por nombre o correo si se proporciona
+        if ($request->has('search') && !empty($request->search)) {
+            $searchTerm = $request->search;
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('nombre', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('apellidos', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('correo', 'LIKE', "%{$searchTerm}%")
+                  ->orWhereRaw("CONCAT(nombre, ' ', apellidos) LIKE ?", ["%{$searchTerm}%"]);
+            });
+        }
+
+        // Paginación: 10 usuarios por página
+        $perPage = $request->integer('per_page', 10);
+        $page = $request->integer('page', 1);
+        
+        $usuarios = $query->orderBy('created_at', 'desc')->paginate($perPage, ['*'], 'page', $page);
 
         // Formatear fechas en formato d-m-Y
-        $usuariosFormateados = $usuarios->map(function ($usuario) {
+        $usuariosFormateados = $usuarios->getCollection()->map(function ($usuario) {
             $usuarioArray = $usuario->toArray();
             // Formatear created_at
             if (isset($usuarioArray['created_at']) && $usuarioArray['created_at']) {
@@ -55,7 +77,15 @@ class UsuarioController extends Controller
             return $usuarioArray;
         });
 
-        return response()->json($usuariosFormateados);
+        return response()->json([
+            'data' => $usuariosFormateados,
+            'current_page' => $usuarios->currentPage(),
+            'last_page' => $usuarios->lastPage(),
+            'per_page' => $usuarios->perPage(),
+            'total' => $usuarios->total(),
+            'from' => $usuarios->firstItem(),
+            'to' => $usuarios->lastItem()
+        ]);
     }
 
     public function store(UsuarioRequest $request)

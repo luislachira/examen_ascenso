@@ -77,6 +77,19 @@ class ExamenController extends Controller
             });
         });
 
+        // Obtener IDs de exámenes que el usuario ya finalizó (tiene intento con estado 'enviado')
+        $examenesFinalizados = DB::table('intento_examenes')
+            ->where('idUsuario', $idUsuario)
+            ->where('estado', 'enviado')
+            ->distinct()
+            ->pluck('idExamen')
+            ->toArray();
+
+        // Excluir exámenes que el usuario ya finalizó (un solo intento por examen)
+        if (!empty($examenesFinalizados)) {
+            $query->whereNotIn('idExamen', $examenesFinalizados);
+        }
+
         // Aplicar paginación
         $perPage = request()->integer('per_page', 10);
         $page = request()->integer('page', 1);
@@ -214,6 +227,24 @@ class ExamenController extends Controller
         }
         // Para exámenes finalizados (estado = '2'), ya fue validado arriba
 
+        // Verificar que el usuario no haya finalizado este examen (un solo intento por examen)
+        $examenFinalizado = IntentoExamen::where('idExamen', $examen->idExamen)
+            ->where('idUsuario', $idUsuario)
+            ->where('estado', 'enviado')
+            ->first();
+
+        if ($examenFinalizado) {
+            // Si el examen está finalizado (estado = '2'), permitir ver detalles para revisar resultados
+            // Pero si el examen está publicado (estado = '1'), bloquear acceso
+            if ($examen->estado === '1') {
+                return response()->json([
+                    'message' => 'Ya has finalizado este examen. Solo se permite un intento por examen.',
+                    'ya_finalizado' => true
+                ], 422);
+            }
+            // Si el examen está finalizado (estado = '2'), permitir ver detalles para revisar resultados
+        }
+
         // Verificar visibilidad: público o asignado al usuario
         $esAsignado = DB::table('examenes_usuarios')
             ->where('idExamen', $examen->idExamen)
@@ -333,6 +364,19 @@ class ExamenController extends Controller
 
             if ($examen->tipo_acceso === 'privado' && !$esAsignado) {
                 return response()->json(['message' => 'No tienes acceso a este examen'], 403);
+            }
+
+            // Verificar que el usuario no haya finalizado este examen (un solo intento por examen)
+            $examenFinalizado = IntentoExamen::where('idExamen', $examen->idExamen)
+                ->where('idUsuario', $idUsuario)
+                ->where('estado', 'enviado')
+                ->first();
+
+            if ($examenFinalizado) {
+                return response()->json([
+                    'message' => 'Ya has finalizado este examen. Solo se permite un intento por examen.',
+                    'ya_finalizado' => true
+                ], 422);
             }
 
             // Verificar que no tenga un examen en curso (estado 'iniciado')
@@ -458,7 +502,7 @@ class ExamenController extends Controller
         $examen = $intento->examen;
 
         // Calcular tiempo restante
-        $tiempoTranscurrido = Carbon::now()->diffInSeconds($intento->hora_inicio);
+        $tiempoTranscurrido = Carbon::now(config('app.timezone'))->diffInSeconds($intento->hora_inicio);
         $tiempoRestante = max(0, ($examen->tiempo_limite * 60) - $tiempoTranscurrido);
 
         // Si el tiempo se agotó, finalizar automáticamente
@@ -495,7 +539,7 @@ class ExamenController extends Controller
 
         $intento->update([
             'puntaje' => $puntaje,
-            'hora_fin' => Carbon::now(),
+            'hora_fin' => Carbon::now(config('app.timezone')),
             'estado' => 'enviado' // Finalizado
         ]);
     }

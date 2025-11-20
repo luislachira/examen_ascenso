@@ -76,22 +76,29 @@ const ExamenesIndex: React.FC = () => {
   // Manejar búsqueda
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setFilters(prev => ({ ...prev, page: 1 }));
-    getExamenes({ ...filters, page: 1 });
+    setFilters(prev => {
+      const newFilters = { ...prev, page: 1 };
+      getExamenes(newFilters);
+      return newFilters;
+    });
   };
 
   // Cambiar filtros
   const handleFilterChange = (key: keyof ExamenFilters, value: string | number | undefined) => {
-    const newFilters = { ...filters, [key]: value, page: 1 };
-    setFilters(newFilters);
-    getExamenes(newFilters);
+    setFilters(prev => {
+      const newFilters = { ...prev, [key]: value, page: 1 };
+      getExamenes(newFilters);
+      return newFilters;
+    });
   };
 
   // Cambiar página
   const handlePageChange = (page: number) => {
-    const newFilters = { ...filters, page };
-    setFilters(newFilters);
-    getExamenes(newFilters);
+    setFilters(prev => {
+      const newFilters = { ...prev, page };
+      getExamenes(newFilters);
+      return newFilters;
+    });
   };
 
   // Eliminar examen (exámenes en borrador o finalizados)
